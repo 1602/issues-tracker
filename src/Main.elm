@@ -44,7 +44,7 @@ type alias Model =
     , location : Location
     , now : Date.Date
     , error : Maybe String
-    , backlogIssues : Maybe (List Issue)
+    , backlog : Maybe (List (List Issue))
     , currentIssues : Maybe (List Issue)
     , iceboxIssues : Maybe (List Issue)
     , closedIssues : Maybe (List Issue)
@@ -83,7 +83,7 @@ aboutToLoadResource loc model =
     in
         case page of
             Just IssuesIndex ->
-                { model | backlogIssues = Just [] }
+                { model | iceboxIssues = Just [] }
 
 
             Nothing ->
@@ -102,9 +102,9 @@ loadResource loc user =
 
                     Just IssuesIndex ->
                         [ fetchIssues user.secretKey Current
-                        , fetchIssues user.secretKey Backlog
+                        , fetchBacklog user.secretKey
                         , fetchIssues user.secretKey Icebox
-                        , fetchIssues user.secretKey Done
+                        -- , fetchIssues user.secretKey Done
                         ]
 
                     Nothing ->
@@ -145,6 +145,12 @@ update msg model =
             )
                 ! loadResource location model.user
 
+        LoadMilestones result ->
+            case result of
+                Err error ->
+                    { model | error = Just (toString error) } ! []
+                Ok milestones ->
+                    { model | backlog = Just milestones, error = Nothing } ! []
 
         IssuesLoaded column result ->
             save result
@@ -154,10 +160,10 @@ update msg model =
                         { model | currentIssues = Just a }
                     Icebox ->
                         { model | iceboxIssues = Just a }
-                    Backlog ->
-                        { model | backlogIssues = Just a }
                     Done ->
                         { model | closedIssues = Just a }
+                    Backlog ->
+                        model
                 )
 
 
@@ -232,12 +238,19 @@ view model =
 viewPage : AppUser -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
     let
-        displayIssues issues =
+        displayIssuesWithinMilestones lists =
+            case lists of
+                Just issues ->
+                    listIssuesWithinMilestones issues
+                Nothing ->
+                    span [ cellStyle "400px" ] [ text "Loading..." ]
+
+        displayIssues issues col =
             case issues of
                 Just issues ->
-                    listIssues issues
+                    listIssues issues col
                 Nothing ->
-                    text "Loading..."
+                    span [ cellStyle "400px" ] [ text "Loading..." ]
     in
         case route of
             Nothing ->
@@ -252,44 +265,74 @@ viewPage user model route =
                             ]
                             ]
                             [ Html.section []
-                                [ Html.h1 [] [ text "Icebox" ]
-                                , displayIssues model.iceboxIssues
+                                [ Html.h3 [] [ text "Icebox" ]
+                                , displayIssues model.iceboxIssues Icebox
                                 ]
                             , Html.section []
-                                [ Html.h1 [] [ text "Backlog" ]
-                                , displayIssues model.backlogIssues
+                                [ Html.h3 [] [ text "Backlog" ]
+                                , displayIssuesWithinMilestones model.backlog
                                 ]
                             , Html.section []
-                                [ Html.h1 [] [ text "In progress" ]
-                                , displayIssues model.currentIssues
+                                [ Html.h3 [] [ text "In progress" ]
+                                , displayIssues model.currentIssues Current
                                 ]
-                            , Html.section []
-                                [ Html.h1 [] [ text "Done" ]
-                                , displayIssues model.closedIssues
-                                ]
+                            -- , Html.section []
+                                -- [ Html.h3 [] [ text "Done" ]
+                                -- , displayIssues model.closedIssues
+                                -- ]
                             ]
 
 
 
+listIssuesWithinMilestones : List (List Issue) -> Html Msg
+listIssuesWithinMilestones lists =
+    lists
+        |> List.map
+            (\list ->
+                case List.head list of
+                    Just issue ->
+                        div []
+                        ([ Html.strong [ cellStyle "400px" ]
+                            [ case issue.milestone of
+                                Just milestone ->
+                                    Html.strong [ style [("color", "yellowgreen")]] [ text milestone.title ]
 
-listIssues : List Issue -> Html Msg
-listIssues issues =
+                                Nothing ->
+                                    text ""
+                            ]
+                        ] ++ [ div [] [ (listIssues list Backlog) ]])
+                    Nothing ->
+                        text ""
+            )
+        |> div []
+
+listIssues : List Issue -> Column -> Html Msg
+listIssues issues col =
     issues
         |> List.map
             (\issue ->
                 div []
-                    [ span [ cellStyle "calc(100% - 4px)" ]
-                        [ text <| "#" ++ issue.number ++ " " ++ issue.title
-                        , text <| case List.head issue.assignees of
+                    [ span [ cellStyle "400px" ]
+                        [ Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
+                        , text <| " " ++ issue.title ++ " "
+                        , Html.i [ style [("color", "darkgrey")] ] [ text <| case List.head issue.assignees of
                             Just user ->
-                                " (on " ++ user.login ++ ")"
+                                "(on " ++ user.login ++ ")"
                             Nothing ->
-                                ""
-                        , text <| case issue.milestone of
-                            Nothing ->
-                                ""
-                            Just milestone ->
-                                toString milestone.number
+                                "(unassigned)"
+                        ]
+                        , case col of
+                            Backlog ->
+                                text " [ unplan ] [ start ] "
+
+                            Icebox ->
+                                text " [ plan ] "
+
+                            Current ->
+                                text " [ unstart ] [ finish ] "
+
+                            Done ->
+                                text " [ restart ] [ ice ] "
                         ]
                     ]
             )
@@ -316,7 +359,7 @@ cellStyle width =
         , ( "overflow", "hidden" )
         , ( "text-overflow", "ellipsis" )
         , ( "display", "inline-block" )
-        -- , ( "white-space", "nowrap" )
+        , ( "white-space", "nowrap" )
         , ( "background", "rgba(255,255,255,0.1)" )
         , ( "position", "relative" )
         , ( "box-sizing", "border-box" )

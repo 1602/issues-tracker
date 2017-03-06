@@ -40,6 +40,7 @@ type alias Issue =
     , description : String
     , assignees : List User
     , milestone : Maybe Milestone
+    , htmlUrl : String
     }
 
 type alias Milestone =
@@ -51,5 +52,5 @@ type alias Milestone =
     --, creator : User
     , openIssues : Int
     , closedIssues : Int
-    , dueOn : Date.Date
+    , dueOn : Maybe Date.Date
     }

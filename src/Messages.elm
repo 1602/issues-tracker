@@ -9,6 +9,7 @@ import Navigation exposing (Location)
 
 type Msg
     = NoOp
+    | LoadMilestones (Result Error (List (List Issue)))
     | CurrentDate Date.Date
     | CurrentTime Time.Time
     | UrlChange Location

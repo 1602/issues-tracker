@@ -2,6 +2,7 @@ module Services exposing (..)
 
 import Json.Decode as Decode
 import Base64
+import Task
 import Http exposing (Error, Response)
 import Messages exposing (..)
 import Decoders exposing (..)
@@ -10,7 +11,6 @@ import Models exposing (..)
 
 -- import Json.Encode as Encode
 -- import Base exposing (..)
-
 
 env : String
 env =
@@ -29,6 +29,51 @@ authHeader secretKey =
     Http.header "Authorization" <|
         "Basic "
             ++ (secretKey ++ ":" |> Base64.encode |> Result.withDefault "")
+
+fetchBacklog : String -> Cmd Msg
+fetchBacklog accessToken =
+    let
+        fetchIssuesForMilestones milestones =
+            milestones
+                |> List.map fetchIssuesForMilestone
+                |> Task.sequence
+
+        fetchIssuesForMilestone milestone =
+            Http.request
+                { method = "GET"
+                , headers = []
+                , url =
+                    "https://api.github.com/repos/"
+                        ++ repo
+                        ++ "/issues?access_token="
+                        ++ accessToken
+                        ++ "&milestone="
+                        ++ milestone.number
+                , expect = Http.expectJson <| Decode.list issueDecoder
+                , body = Http.emptyBody
+                , timeout = Nothing
+                , withCredentials = False
+                }
+                    |> Http.toTask
+
+        fetchMilestones =
+            Http.request
+                { method = "GET"
+                , headers = []
+                , url =
+                    "https://api.github.com/repos/"
+                        ++ repo
+                        ++ "/milestones?access_token="
+                        ++ accessToken
+                , expect = Http.expectJson <| Decode.list milestoneDecoder
+                , body = Http.emptyBody
+                , timeout = Nothing
+                , withCredentials = False
+                }
+                    |> Http.toTask
+    in
+        Task.attempt LoadMilestones (fetchMilestones
+            |> Task.andThen fetchIssuesForMilestones)
 
 
 fetchIssues : String -> Column -> Cmd Msg
