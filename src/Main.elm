@@ -4,24 +4,26 @@ import Route exposing (Route, Route(..), parseHash)
 import Models exposing (..)
 import Messages exposing (..)
 import Services exposing (..)
--- import Base exposing (..)
+import Dict
+import List
 import Html exposing (Html, span, text, img, div)
--- import Cruft exposing (clipboardIcon)
 import Navigation exposing (programWithFlags, Location)
 import Http exposing (Error, Response)
--- import Markdown
 import Date
--- import Date.Extra
 import Time
 import Task
--- import Date.Distance as Distance
+import Date.Distance as Distance
+import Html.Attributes as Attrs exposing (style, class, attribute, src)
+import Html.Events exposing (onClick, onInput)
+
+
+-- import Base exposing (..)
+-- import Cruft exposing (clipboardIcon)
+-- import Date.Extra
+-- import Markdown
 -- import Json.Decode as Decode exposing (field)
 -- import Json.Encode as Encode
 -- import List.Extra exposing (find)
-import Html.Attributes as Attrs exposing (style, class, attribute, src)
--- import Html.Events exposing (onClick, onInput)
-
-
 -- APP
 
 
@@ -44,10 +46,10 @@ type alias Model =
     , location : Location
     , now : Date.Date
     , error : Maybe String
-    , backlog : Maybe (List (List Issue))
     , currentIssues : Maybe (List Issue)
     , iceboxIssues : Maybe (List Issue)
     , closedIssues : Maybe (List Issue)
+    , milestones : Maybe (Dict.Dict String ExpandedMilestone)
     }
 
 
@@ -66,8 +68,8 @@ init persistentData location =
            , case persistentData.user of
                 Just user ->
                     Cmd.none
-                    --fetchClients user.secretKey
 
+                --fetchClients user.secretKey
                 Nothing ->
                     Cmd.none
            ]
@@ -85,7 +87,6 @@ aboutToLoadResource loc model =
             Just IssuesIndex ->
                 { model | iceboxIssues = Just [] }
 
-
             Nothing ->
                 model
 
@@ -99,12 +100,10 @@ loadResource loc user =
         case user of
             Just user ->
                 case page of
-
                     Just IssuesIndex ->
                         [ fetchIssues user.secretKey Current
-                        , fetchBacklog user.secretKey
                         , fetchIssues user.secretKey Icebox
-                        -- , fetchIssues user.secretKey Done
+                        , fetchMilestones user.secretKey
                         ]
 
                     Nothing ->
@@ -145,30 +144,87 @@ update msg model =
             )
                 ! loadResource location model.user
 
+        MilestoneIssuesLoaded num issueState result ->
+            case result of
+                Err error ->
+                    { model | error = Just (toString error) } ! []
+
+                Ok issues ->
+                    { model
+                        | milestones =
+                            Just
+                                (Maybe.withDefault Dict.empty model.milestones
+                                    |> Dict.update num
+                                        (\s ->
+                                            case s of
+                                                Just ms ->
+                                                    case issueState of
+                                                        IssueOpen ->
+                                                            Just { ms | openIssues = Just issues }
+
+                                                        IssueClosed ->
+                                                            Just { ms | closedIssues = Just issues }
+
+                                                Nothing ->
+                                                    Nothing
+                                        )
+                                )
+                    }
+                        ! []
+
         LoadMilestones result ->
             case result of
                 Err error ->
                     { model | error = Just (toString error) } ! []
+
                 Ok milestones ->
-                    { model | backlog = Just milestones, error = Nothing } ! []
+                    { model
+                        | milestones =
+                            milestones
+                                |> List.foldl
+                                    (\ms ->
+                                        Dict.insert ms.number <| ExpandedMilestone ms Nothing Nothing
+                                    )
+                                    Dict.empty
+                                |> Just
+                        , error = Nothing
+                    }
+                        ! (case model.user of
+                            Just user ->
+                                (milestones |> List.map (fetchMilestoneIssues user.secretKey IssueOpen))
+                                    ++ (milestones |> List.map (fetchMilestoneIssues user.secretKey IssueClosed))
+
+                            Nothing ->
+                                []
+                          )
 
         IssuesLoaded column result ->
             save result
                 model
-                (\a -> case column of
-                    Current ->
-                        { model | currentIssues = Just a }
-                    Icebox ->
-                        { model | iceboxIssues = Just a }
-                    Done ->
-                        { model | closedIssues = Just a }
-                    Backlog ->
-                        model
-                )
+                (\a ->
+                    case column of
+                        Current ->
+                            { model | currentIssues = Just a }
 
+                        Icebox ->
+                            { model | iceboxIssues = Just a }
+
+                        Done ->
+                            { model | closedIssues = Just a }
+
+                        Backlog ->
+                            model
+                )
 
         CopyText str ->
             model ! [ clipboard str ]
+
+        IssueAction issue action ->
+            case action of
+                "unplan" ->
+                    model ! [ unsetMilestone issue ]
+                _ ->
+                    model ! []
 
 
 save : Result Error a -> Model -> (a -> Model) -> ( Model, Cmd Msg )
@@ -226,8 +282,8 @@ view model =
         case model.user of
             Just user ->
                 div []
-                    [ viewTopbar user model.location
-                    , viewPage user model <| parseHash model.location
+                    -- [ viewTopbar user model.location
+                    [ viewPage user model <| parseHash model.location
                     , error
                     ]
 
@@ -238,10 +294,11 @@ view model =
 viewPage : AppUser -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
     let
-        displayIssuesWithinMilestones lists =
-            case lists of
-                Just issues ->
-                    listIssuesWithinMilestones issues
+        displayIssuesWithinMilestones milestones issueState =
+            case milestones of
+                Just milestones ->
+                    listIssuesWithinMilestones milestones issueState model.now
+
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
 
@@ -249,6 +306,7 @@ viewPage user model route =
             case issues of
                 Just issues ->
                     listIssues issues col
+
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
     in
@@ -259,84 +317,170 @@ viewPage user model route =
             Just r ->
                 case r of
                     IssuesIndex ->
-                        Html.main_ [ style
-                            [ ("display", "flex")
-                            , ("width", "100%")
-                            ]
+                        Html.main_
+                            [ style
+                                [ ( "display", "flex" )
+                                , ( "width", "100%" )
+                                ]
                             ]
                             [ Html.section []
-                                [ Html.h3 [] [ text "Icebox" ]
+                                [ Html.h3 [] [ text "❄ Icebox" ]
                                 , displayIssues model.iceboxIssues Icebox
                                 ]
                             , Html.section []
-                                [ Html.h3 [] [ text "Backlog" ]
-                                , displayIssuesWithinMilestones model.backlog
+                                [ Html.h3 [] [ text "🚥 Backlog" ]
+                                , displayIssuesWithinMilestones model.milestones IssueOpen
                                 ]
                             , Html.section []
-                                [ Html.h3 [] [ text "In progress" ]
+                                [ Html.h3 [] [ text "🐝 In progress" ]
                                 , displayIssues model.currentIssues Current
                                 ]
-                            -- , Html.section []
-                                -- [ Html.h3 [] [ text "Done" ]
-                                -- , displayIssues model.closedIssues
-                                -- ]
+                            , Html.section []
+                                [ Html.h3 [] [ text "🎉 Done" ]
+                                , displayIssuesWithinMilestones model.milestones IssueClosed
+                                ]
                             ]
 
 
+listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Html Msg
+listIssuesWithinMilestones milestones issueState now =
+    milestones
+        |> Dict.values
+        |> List.sortBy (\ems -> case ems.milestone.dueOn of
+            Nothing ->
+                1 / 0
 
-listIssuesWithinMilestones : List (List Issue) -> Html Msg
-listIssuesWithinMilestones lists =
-    lists
+            Just date ->
+                date
+                    |> Date.toTime
+                    |> Time.inSeconds
+                )
         |> List.map
-            (\list ->
-                case List.head list of
-                    Just issue ->
-                        div []
-                        ([ Html.strong [ cellStyle "400px" ]
-                            [ case issue.milestone of
-                                Just milestone ->
-                                    Html.strong [ style [("color", "yellowgreen")]] [ text milestone.title ]
+            (\expandedMilestone ->
+                let
+                    displayIssuesOrLoading issues =
+                        case issues of
+                            Just issues ->
+                                listIssues issues
+                                    (case issueState of
+                                        IssueOpen ->
+                                            Backlog
+
+                                        IssueClosed ->
+                                            Done
+                                    )
+
+                            Nothing ->
+                                span [ cellStyle "400px" ] [ text "Loading" ]
+
+                    issues =
+                        case issueState of
+                            IssueOpen ->
+                                displayIssuesOrLoading expandedMilestone.openIssues
+
+                            IssueClosed ->
+                                displayIssuesOrLoading expandedMilestone.closedIssues
+                in
+                    div []
+                        [ span [ cellStyle "400px" ]
+                            [ Html.strong [ style [ ( "color", "yellowgreen" ) ] ]
+                                [ text <| "🏁 " ++ expandedMilestone.milestone.title ]
+                            , case expandedMilestone.milestone.dueOn of
+                                Just date ->
+                                    if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
+                                        text " overdue"
+                                    else
+                                        text <| " due in " ++ (Distance.inWords now date)
 
                                 Nothing ->
-                                    text ""
+                                    text " (no due date)"
                             ]
-                        ] ++ [ div [] [ (listIssues list Backlog) ]])
-                    Nothing ->
-                        text ""
+                        , issues
+                        ]
             )
         |> div []
+
 
 listIssues : List Issue -> Column -> Html Msg
 listIssues issues col =
-    issues
-        |> List.map
-            (\issue ->
-                div []
-                    [ span [ cellStyle "400px" ]
-                        [ Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
-                        , text <| " " ++ issue.title ++ " "
-                        , Html.i [ style [("color", "darkgrey")] ] [ text <| case List.head issue.assignees of
-                            Just user ->
-                                "(on " ++ user.login ++ ")"
-                            Nothing ->
-                                "(unassigned)"
-                        ]
-                        , case col of
-                            Backlog ->
-                                text " [ unplan ] [ start ] "
-
-                            Icebox ->
-                                text " [ plan ] "
-
-                            Current ->
-                                text " [ unstart ] [ finish ] "
-
-                            Done ->
-                                text " [ restart ] [ ice ] "
-                        ]
+    let
+        button issue title =
+            Html.button
+                [ style
+                    [ ( "margin-right", "15px" )
+                    , ( "margin-top", "9px" )
+                    , ( "border", "0px" )
+                    , ( "background", "#eee" )
+                    , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
+                    , ( "border-radius", "1px" )
+                    , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
                     ]
-            )
-        |> div []
+                ,   onClick (IssueAction issue title)
+                ]
+                [ text title ]
+
+        getTypeIcon issue =
+            issue.labels
+                |> List.foldl
+                    (\l res ->
+                        if l.name == "Type: Bug" then
+                            Just "🐞 "
+                        else if l.name == "Type: Feature" then
+                            Just "🔨 "
+                        else if l.name == "Type: Research" then
+                            Just "🔎 "
+                        else
+                            res
+                    )
+                    Nothing
+                |> Maybe.withDefault "❓ "
+
+        getPriorityColor issue =
+            issue.labels
+                |> List.foldl
+                    (\l res ->
+                        if l.name == "Priority: High" then
+                            Just "orange"
+                        else if l.name == "Priority: Critical" then
+                            Just "#fd4242"
+                        else
+                            res
+                    )
+                    Nothing
+                |> Maybe.withDefault "grey"
+    in
+        issues
+            |> List.map
+                (\issue ->
+                    div [ Attrs.class "story" ]
+                        [ span [ cellStyle "400px" ]
+                            [ text <| getTypeIcon issue
+                            , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
+                            , span [ style [ ( "color", getPriorityColor issue ) ] ] [ text <| " " ++ issue.title ++ " " ]
+                            , Html.i [ style [ ( "color", "darkgrey" ) ] ]
+                                [ text <|
+                                    if List.length issue.assignees == 0 then
+                                        "(unassigned)"
+                                    else
+                                        "(on " ++ (issue.assignees |> List.map .login |> String.join ", ") ++ ")"
+                                ]
+                            , div [ Attrs.class "buttons" ] <|
+                                case col of
+                                    Backlog ->
+                                        [ button issue "unplan", button issue "start" ]
+
+                                    Icebox ->
+                                        [ button issue "plan" ]
+
+                                    Current ->
+                                        [ button issue "unstart", button issue "finish" ]
+
+                                    Done ->
+                                        [ button issue "reopen" ]
+                            ]
+                        ]
+                )
+            |> div []
 
 
 intToDate : Int -> Date.Date
@@ -345,7 +489,6 @@ intToDate ms =
         |> toFloat
         |> (\ms -> Time.millisecond * ms)
         |> Date.fromTime
-
 
 
 cellStyle : String -> Html.Attribute msg
@@ -364,7 +507,6 @@ cellStyle width =
         , ( "position", "relative" )
         , ( "box-sizing", "border-box" )
         ]
-
 
 
 shortenUuid : String -> String
@@ -386,7 +528,6 @@ textareaStyle =
         , ( "padding", "5px" )
         , ( "color", "#0F0" )
         ]
-
 
 
 viewTopbar : AppUser -> Location -> Html msg

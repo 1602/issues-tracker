@@ -14,6 +14,9 @@ type Column
     | Done
 
 
+type IssueState = IssueOpen | IssueClosed
+
+
 type alias PersistedData =
     { user : Maybe AppUser
     }
@@ -33,14 +36,20 @@ type alias User =
 
 
 type alias Issue =
-    { id : Id
-    , number : Id
+    { number : Id
     , state : String
     , title : String
     , description : String
     , assignees : List User
     , milestone : Maybe Milestone
     , htmlUrl : String
+    , labels : List Label
+    }
+
+type alias Label =
+    { id : Id
+    , name : String
+    , color : String
     }
 
 type alias Milestone =
@@ -53,4 +62,10 @@ type alias Milestone =
     , openIssues : Int
     , closedIssues : Int
     , dueOn : Maybe Date.Date
+    }
+
+type alias ExpandedMilestone =
+    { milestone : Milestone
+    , openIssues : Maybe (List Issue)
+    , closedIssues : Maybe (List Issue)
     }

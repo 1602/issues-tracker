@@ -2,7 +2,7 @@ module Services exposing (..)
 
 import Json.Decode as Decode
 import Base64
-import Task
+-- import Task
 import Http exposing (Error, Response)
 import Messages exposing (..)
 import Decoders exposing (..)
@@ -30,6 +30,7 @@ authHeader secretKey =
         "Basic "
             ++ (secretKey ++ ":" |> Base64.encode |> Result.withDefault "")
 
+        {-
 fetchBacklog : String -> Cmd Msg
 fetchBacklog accessToken =
     let
@@ -74,7 +75,36 @@ fetchBacklog accessToken =
     in
         Task.attempt LoadMilestones (fetchMilestones
             |> Task.andThen fetchIssuesForMilestones)
+        -}
 
+
+fetchMilestoneIssues : String -> IssueState -> Milestone -> Cmd Msg
+fetchMilestoneIssues accessToken issueState ms =
+    let
+        state =
+            case issueState of
+                IssueOpen ->
+                    "&state=open"
+
+                IssueClosed ->
+                    "&state=closed"
+    in
+        Http.request
+            { method = "GET"
+            , headers = []
+            , url =
+                "https://api.github.com/repos/"
+                    ++ repo
+                    ++ "/issues?access_token="
+                    ++ accessToken
+                    ++ state
+                    ++ "&milestone=" ++ ms.number
+            , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
+            , body = Http.emptyBody
+            , timeout = Nothing
+            , withCredentials = False
+            }
+                |> Http.send (MilestoneIssuesLoaded ms.number issueState)
 
 fetchIssues : String -> Column -> Cmd Msg
 fetchIssues accessToken column =
@@ -126,3 +156,40 @@ fetchIssues accessToken column =
             , withCredentials = False
             }
             |> Http.send (IssuesLoaded column)
+
+
+unsetMilestone : Issue -> Cmd Msg
+unsetMilestone issue =
+    Http.request
+        { method = "PATCH"
+        , headers = []
+        , url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/issues?access_token="
+                ++ accessToken
+        , expect = Http.expectJson issueDecoder
+        , body = Http.jsonBody -- TODO: https://developer.github.com/v3/issues/#edit-an-issue
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send (IssuesLoaded column)
+
+    ]
+
+fetchMilestones : String -> Cmd Msg
+fetchMilestones accessToken =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/milestones?access_token="
+                ++ accessToken
+        , expect = Http.expectJson <| Decode.list milestoneDecoder
+        , body = Http.emptyBody
+        , timeout = Nothing
+        , withCredentials = False
+        }
+            |> Http.send LoadMilestones

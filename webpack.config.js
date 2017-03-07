@@ -126,12 +126,14 @@ if ( TARGET_ENV === 'production' ) {
       // extract CSS into a separate file
       new ExtractTextPlugin( './[hash].css', { allChunks: true } ),
 
+        /*
       // minify & mangle JS/CSS
       new webpack.optimize.UglifyJsPlugin({
           minimize:   true,
           compressor: { warnings: false }
           // mangle:  true
       })
+      */
     ]
 
   });
