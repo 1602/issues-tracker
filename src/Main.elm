@@ -528,19 +528,19 @@ viewPage user model route =
                     ]
                 ]
                 [ Html.section []
-                    [ Html.h3 [] [ text "❄ Icebox" ]
+                    [ Html.h3 [] [ text "❄ Icebox ", Html.small [] [ text "(keep this place empty)" ] ]
                     , displayIssues model.iceboxIssues Icebox
                     ]
                 , Html.section []
-                    [ Html.h3 [] [ text "🚥 Backlog" ]
+                    [ Html.h3 [] [ text "🚥 Backlog ", Html.small [] [ text "(plan all the things via milestones)" ] ]
                     , displayIssuesWithinMilestones model.milestones IssueOpen
                     ]
                 , Html.section []
-                    [ Html.h3 [] [ text "🐝 In progress" ]
+                    [ Html.h3 [] [ text "🐝 In progress ", Html.small [] [ text "(issues with status 'In Progress')" ] ]
                     , displayIssues model.currentIssues Current
                     ]
                 , Html.section []
-                    [ Html.h3 [] [ text "🎉 Done" ]
+                    [ Html.h3 [] [ text "🎉 Done ", Html.small [] [ text "(closed issues)" ] ]
                     , displayIssuesWithinMilestones model.milestones IssueClosed
                     ]
                 ]
