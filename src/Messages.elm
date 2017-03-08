@@ -15,6 +15,9 @@ type Msg
     | CurrentTime Time.Time
     | UrlChange Location
     | IssuesLoaded Column (Result Error (List Issue))
+    | UnsetMilestone Milestone (Result Error Issue)
+    | SetMilestone Issue Milestone
+    | MilestoneSet Milestone (Result Error Issue)
     | IssueAction Issue String
     | CopyText String
 

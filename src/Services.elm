@@ -7,6 +7,7 @@ import Http exposing (Error, Response)
 import Messages exposing (..)
 import Decoders exposing (..)
 import Models exposing (..)
+import Json.Encode as Encode
 
 
 -- import Json.Encode as Encode
@@ -91,7 +92,7 @@ fetchMilestoneIssues accessToken issueState ms =
     in
         Http.request
             { method = "GET"
-            , headers = []
+            , headers = [ Http.header "If-Modified-Since" "0"]
             , url =
                 "https://api.github.com/repos/"
                     ++ repo
@@ -115,7 +116,7 @@ fetchIssues accessToken column =
                     "&milestone=none"
 
                 _ ->
-                    "&milestone=*"
+                    ""
 
         labels =
             case column of
@@ -141,7 +142,7 @@ fetchIssues accessToken column =
     in
         Http.request
             { method = "GET"
-            , headers = []
+            , headers = [ Http.header "If-Modified-Since" "0"]
             , url =
                 "https://api.github.com/repos/"
                     ++ repo
@@ -157,31 +158,78 @@ fetchIssues accessToken column =
             }
             |> Http.send (IssuesLoaded column)
 
-
-unsetMilestone : Issue -> Cmd Msg
-unsetMilestone issue =
+updateIssueWith : String -> Decode.Value -> String -> (Result Error Issue -> a) -> Cmd a
+updateIssueWith issueNumber issue accessToken onComplete =
     Http.request
         { method = "PATCH"
         , headers = []
         , url =
             "https://api.github.com/repos/"
                 ++ repo
-                ++ "/issues?access_token="
+                ++ "/issues/"
+                ++ issueNumber
+                ++ "?access_token="
                 ++ accessToken
         , expect = Http.expectJson issueDecoder
-        , body = Http.jsonBody -- TODO: https://developer.github.com/v3/issues/#edit-an-issue
+        , body = Http.jsonBody issue
         , timeout = Nothing
         , withCredentials = False
         }
-        |> Http.send (IssuesLoaded column)
+        |> Http.send onComplete
 
-    ]
+updateIssue : Issue -> String -> (Result Error Issue -> a) -> Cmd a
+updateIssue issue accessToken onComplete =
+    Http.request
+        { method = "PATCH"
+        , headers = []
+        , url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/issues/"
+                ++ issue.number
+                ++ "?access_token="
+                ++ accessToken
+        , expect = Http.expectJson issueDecoder
+        , body = Http.jsonBody <| -- TODO: https://developer.github.com/v3/issues/#edit-an-issue
+            Encode.object
+                [ ( "title", Encode.string issue.title )
+                , ( "body", Encode.string issue.description )
+                , ( "assignees", issue.assignees
+                    |> List.map .login
+                    |> List.map Encode.string
+                    |> Encode.list
+                    )
+                , ( "labels", issue.labels
+                    |> List.map .name
+                    |> List.map Encode.string
+                    |> Encode.list
+                    )
+                , ( "state", Encode.string issue.state )
+                , ( "milestone", Encode.null )
+                {-
+                , case issue.milestone of
+                    Just m ->
+                        ( "milestone", m.number
+                            |> String.toInt
+                            |> Result.toMaybe
+                            |> Maybe.withDefault 0
+                            |> Encode.int
+                        )
+                    Nothing ->
+                        ( "milestone", Encode.null )
+                        -}
+                ]
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send onComplete
+
 
 fetchMilestones : String -> Cmd Msg
 fetchMilestones accessToken =
     Http.request
         { method = "GET"
-        , headers = []
+        , headers = [ Http.header "If-Modified-Since" "0"]
         , url =
             "https://api.github.com/repos/"
                 ++ repo

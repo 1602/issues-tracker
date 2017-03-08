@@ -15,6 +15,7 @@ import Task
 import Date.Distance as Distance
 import Html.Attributes as Attrs exposing (style, class, attribute, src)
 import Html.Events exposing (onClick, onInput)
+import Json.Encode as Encode
 
 
 -- import Base exposing (..)
@@ -50,6 +51,7 @@ type alias Model =
     , iceboxIssues : Maybe (List Issue)
     , closedIssues : Maybe (List Issue)
     , milestones : Maybe (Dict.Dict String ExpandedMilestone)
+    , pickMilestoneForIssue : Maybe Issue
     }
 
 
@@ -59,6 +61,7 @@ init persistentData location =
         persistentData.user
         location
         (Date.fromTime <| Time.millisecond * (toFloat 0))
+        Nothing
         Nothing
         Nothing
         Nothing
@@ -219,11 +222,68 @@ update msg model =
         CopyText str ->
             model ! [ clipboard str ]
 
+        UnsetMilestone m result ->
+            model !
+            (case model.user of
+                Just user ->
+                    [ fetchMilestoneIssues user.secretKey IssueOpen m
+                    , fetchIssues user.secretKey Icebox
+                    ]
+
+                Nothing ->
+                    []
+                    )
+
+        SetMilestone issue milestone ->
+            case model.user of
+                Just user ->
+                    { model | pickMilestoneForIssue = Nothing } !
+                        [ updateIssueWith issue.number (Encode.object
+                            [ ("milestone"
+                                , milestone.number
+                                |> String.toInt
+                                |> Result.toMaybe
+                                |> Maybe.withDefault 0
+                                |> Encode.int
+                                )
+                            ]
+                            ) user.secretKey (MilestoneSet milestone)
+                        ]
+
+                Nothing ->
+                    model ! []
+
+        MilestoneSet m result ->
+            model !
+            (case model.user of
+                Just user ->
+                    [ fetchMilestoneIssues user.secretKey IssueOpen m
+                    , fetchIssues user.secretKey Icebox
+                    ]
+
+                Nothing ->
+                    []
+                    )
+
         IssueAction issue action ->
-            case action of
-                "unplan" ->
-                    model ! [ unsetMilestone issue ]
-                _ ->
+            case model.user of
+                Just user ->
+                    case action of
+                        "unplan" ->
+                            case issue.milestone of
+                                Just m ->
+                                    model !
+                                        [ updateIssue issue user.secretKey (UnsetMilestone m)
+                                        ]
+
+                                Nothing ->
+                                    model ! []
+                        "plan" ->
+                            { model | pickMilestoneForIssue = Just issue } ! []
+
+                        _ ->
+                            model ! []
+                Nothing ->
                     model ! []
 
 
@@ -285,6 +345,27 @@ view model =
                     -- [ viewTopbar user model.location
                     [ viewPage user model <| parseHash model.location
                     , error
+                    , case model.pickMilestoneForIssue of
+                        Just issue ->
+                            div [ style
+                                [ ( "position", "fixed" )
+                                , ( "top", "10px" )
+                                , ( "left", "10px" )
+                                , ( "padding", "10px" )
+                                , ( "background", "black" )
+                                ]
+                                ] [
+                                    model.milestones
+                                        |> Maybe.withDefault Dict.empty
+                                        |> Dict.values
+                                        |> List.map (\s ->
+                                            Html.li [] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
+                                            )
+                                        |> Html.ul []
+                                ]
+
+                        Nothing ->
+                            text ""
                     ]
 
             Nothing ->
@@ -358,10 +439,18 @@ listIssuesWithinMilestones milestones issueState now =
         |> List.map
             (\expandedMilestone ->
                 let
+                    filterOutInProgress issues =
+                        issues
+                            |> List.filter (\issue ->
+                                issue.labels
+                                    |> List.any (\label -> label.name == "Status: In Progress")
+                                    |> not
+                                    )
+
                     displayIssuesOrLoading issues =
                         case issues of
                             Just issues ->
-                                listIssues issues
+                                listIssues (filterOutInProgress issues)
                                     (case issueState of
                                         IssueOpen ->
                                             Backlog
@@ -404,6 +493,19 @@ listIssuesWithinMilestones milestones issueState now =
 listIssues : List Issue -> Column -> Html Msg
 listIssues issues col =
     let
+        filterOutInProgress issues =
+            case col of
+                Icebox ->
+                    issues
+                        |> List.filter (\issue ->
+                            issue.labels
+                                |> List.any (\label -> label.name == "Status: In Progress")
+                                |> not
+                                )
+
+                _ ->
+                    issues
+
         button issue title =
             Html.button
                 [ style
@@ -450,6 +552,7 @@ listIssues issues col =
                 |> Maybe.withDefault "grey"
     in
         issues
+            |> filterOutInProgress
             |> List.map
                 (\issue ->
                     div [ Attrs.class "story" ]
