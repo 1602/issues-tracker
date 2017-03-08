@@ -18,6 +18,11 @@ type Msg
     | UnsetMilestone Milestone (Result Error Issue)
     | SetMilestone Issue Milestone
     | MilestoneSet Milestone (Result Error Issue)
+    | IssueStarted Milestone (Result Error Issue)
+    | IssueRestarted Milestone (Result Error Issue)
+    | IssueFinished Milestone (Result Error Issue)
     | IssueAction Issue String
     | CopyText String
+    | EditAccessToken String
+    | SaveAccessToken
 

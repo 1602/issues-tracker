@@ -44,6 +44,7 @@ main =
 
 type alias Model =
     { user : Maybe AppUser
+    , token : Maybe String
     , location : Location
     , now : Date.Date
     , error : Maybe String
@@ -59,6 +60,7 @@ init : PersistedData -> Location -> ( Model, Cmd Msg )
 init persistentData location =
     Model
         persistentData.user
+        Nothing
         location
         (Date.fromTime <| Time.millisecond * (toFloat 0))
         Nothing
@@ -137,6 +139,15 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        EditAccessToken s ->
+            { model | token = Just s } ! []
+
+        SaveAccessToken ->
+            let
+                user = Just <| AppUser "" "" (Maybe.withDefault "" model.token)
+            in
+                { model | user = user } ! ((saveData <| PersistedData user) :: (loadResource model.location user))
 
         CurrentDate now ->
             { model | now = now } ! []
@@ -268,6 +279,41 @@ update msg model =
                     []
                     )
 
+        IssueRestarted m result ->
+            model !
+            (case model.user of
+                Just user ->
+                    [ fetchMilestoneIssues user.secretKey IssueClosed m
+                    , fetchIssues user.secretKey Current
+                    ]
+
+                Nothing ->
+                    []
+                    )
+        IssueStarted m result ->
+            model !
+            (case model.user of
+                Just user ->
+                    [ fetchMilestoneIssues user.secretKey IssueOpen m
+                    , fetchIssues user.secretKey Current
+                    ]
+
+                Nothing ->
+                    []
+                    )
+
+        IssueFinished m result ->
+            model !
+            (case model.user of
+                Just user ->
+                    [ fetchMilestoneIssues user.secretKey IssueClosed m
+                    , fetchIssues user.secretKey Current
+                    ]
+
+                Nothing ->
+                    []
+                    )
+
         IssueAction issue action ->
             case model.user of
                 Just user ->
@@ -281,6 +327,82 @@ update msg model =
 
                                 Nothing ->
                                     model ! []
+
+                        "start" ->
+                            case issue.milestone of
+                                Just m ->
+                                    model !
+                                        [ updateIssueWith issue.number (Encode.object
+                                            [ ("labels"
+                                                , issue.labels
+                                                    |> List.map .name
+                                                    |> (::) "Status: In Progress"
+                                                    |> List.map Encode.string
+                                                    |> Encode.list
+                                                )
+                                            ]
+                                            ) user.secretKey (IssueStarted m)
+                                            ]
+                                Nothing ->
+                                    model ! []
+
+                        "finish" ->
+                            case issue.milestone of
+                                Just m ->
+                                    model !
+                                        [ updateIssueWith issue.number (Encode.object
+                                            [ ("labels"
+                                                , issue.labels
+                                                    |> List.map .name
+                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.map Encode.string
+                                                    |> Encode.list
+                                                )
+                                            , ( "state", Encode.string "closed" )
+                                            ]
+                                            ) user.secretKey (IssueFinished m)
+                                            ]
+                                Nothing ->
+                                    model ! []
+
+                        "reopen" ->
+                            case issue.milestone of
+                                Just m ->
+                                    model !
+                                        [ updateIssueWith issue.number (Encode.object
+                                            [ ("labels"
+                                                , issue.labels
+                                                    |> List.map .name
+                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> (::) "Status: In Progress"
+                                                    |> List.map Encode.string
+                                                    |> Encode.list
+                                                )
+                                            , ( "state", Encode.string "open" )
+                                            ]
+                                            ) user.secretKey (IssueRestarted m)
+                                            ]
+                                Nothing ->
+                                    model ! []
+
+                        "unstart" ->
+                            case issue.milestone of
+                                Just m ->
+                                    model !
+                                        [ updateIssueWith issue.number (Encode.object
+                                            [ ("labels"
+                                                , issue.labels
+                                                    |> List.map .name
+                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.map Encode.string
+                                                    |> Encode.list
+                                                )
+                                            ]
+                                            ) user.secretKey (IssueStarted m)
+                                            ]
+                                Nothing ->
+                                    model ! []
+
                         "plan" ->
                             { model | pickMilestoneForIssue = Just issue } ! []
 
@@ -372,7 +494,11 @@ view model =
                     ]
 
             Nothing ->
-                div [] []
+                div []
+                    [ text "cheers. visit https://github.com/settings/tokens and fill this input "
+                    , Html.input [ onInput EditAccessToken ] []
+                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
+                    ]
 
 
 viewPage : AppUser -> Model -> Maybe Route -> Html Msg
@@ -478,7 +604,7 @@ listIssuesWithinMilestones milestones issueState now =
                 in
                     div []
                         [ span [ cellStyle "400px" ]
-                            [ Html.strong [ style [ ( "color", "yellowgreen" ) ] ]
+                            [ Html.strong [ style [ ( "color", "yellowgreen" ), ("line-height", "22px"), ("font-size", "14px") ] ]
                                 [ text <| "🏁 " ++ expandedMilestone.milestone.title ]
                             , case expandedMilestone.milestone.dueOn of
                                 Just date ->
@@ -563,16 +689,16 @@ listIssues issues col =
                 (\issue ->
                     div [ Attrs.class "story" ]
                         [ span [ cellStyle "400px" ]
-                            [ text <| getTypeIcon issue
+                            [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , span [ style [ ( "color", getPriorityColor issue ) ] ] [ text <| " " ++ issue.title ++ " " ]
                             , Html.i [ style [ ( "color", "darkgrey" ) ] ]
-                                [ text <|
-                                    if List.length issue.assignees == 0 then
-                                        "(unassigned)"
+                                    (if List.length issue.assignees == 0 then
+                                        [ text "(unassigned)" ]
                                     else
-                                        "(on " ++ (issue.assignees |> List.map .login |> String.join ", ") ++ ")"
-                                ]
+                                        issue.assignees
+                                            |> List.map (\s -> Html.img
+                                            [ src s.avatar, Attrs.width 20, style [("vertical-align", "middle")] ] []))
                             , div [ Attrs.class "buttons" ] <|
                                 case col of
                                     Backlog ->
@@ -582,10 +708,20 @@ listIssues issues col =
                                         [ button issue "plan" ]
 
                                     Current ->
-                                        [ button issue "unstart", button issue "finish" ]
+                                        case issue.milestone of
+                                            Just ms ->
+                                                [ button issue "unstart"
+                                                , button issue "finish" ]
+                                            Nothing ->
+                                                [ button issue "gh" ]
 
                                     Done ->
-                                        [ button issue "reopen" ]
+                                        case issue.milestone of
+                                            Just ms ->
+                                                [ button issue "reopen" ]
+
+                                            Nothing ->
+                                                []
                             ]
                         ]
                 )
