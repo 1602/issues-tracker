@@ -13674,8 +13674,19 @@
 								{ctor: '[]'},
 								{
 									ctor: '::',
-									_0: _elm_lang$html$Html$text('❄ Icebox'),
-									_1: {ctor: '[]'}
+									_0: _elm_lang$html$Html$text('❄ Icebox '),
+									_1: {
+										ctor: '::',
+										_0: A2(
+											_elm_lang$html$Html$small,
+											{ctor: '[]'},
+											{
+												ctor: '::',
+												_0: _elm_lang$html$Html$text('(keep this place empty)'),
+												_1: {ctor: '[]'}
+											}),
+										_1: {ctor: '[]'}
+									}
 								}),
 							_1: {
 								ctor: '::',
@@ -13695,8 +13706,19 @@
 									{ctor: '[]'},
 									{
 										ctor: '::',
-										_0: _elm_lang$html$Html$text('🚥 Backlog'),
-										_1: {ctor: '[]'}
+										_0: _elm_lang$html$Html$text('🚥 Backlog '),
+										_1: {
+											ctor: '::',
+											_0: A2(
+												_elm_lang$html$Html$small,
+												{ctor: '[]'},
+												{
+													ctor: '::',
+													_0: _elm_lang$html$Html$text('(plan all the things via milestones)'),
+													_1: {ctor: '[]'}
+												}),
+											_1: {ctor: '[]'}
+										}
 									}),
 								_1: {
 									ctor: '::',
@@ -13716,8 +13738,19 @@
 										{ctor: '[]'},
 										{
 											ctor: '::',
-											_0: _elm_lang$html$Html$text('🐝 In progress'),
-											_1: {ctor: '[]'}
+											_0: _elm_lang$html$Html$text('🐝 In progress '),
+											_1: {
+												ctor: '::',
+												_0: A2(
+													_elm_lang$html$Html$small,
+													{ctor: '[]'},
+													{
+														ctor: '::',
+														_0: _elm_lang$html$Html$text('(issues with status \'In Progress\')'),
+														_1: {ctor: '[]'}
+													}),
+												_1: {ctor: '[]'}
+											}
 										}),
 									_1: {
 										ctor: '::',
@@ -13737,8 +13770,19 @@
 											{ctor: '[]'},
 											{
 												ctor: '::',
-												_0: _elm_lang$html$Html$text('🎉 Done'),
-												_1: {ctor: '[]'}
+												_0: _elm_lang$html$Html$text('🎉 Done '),
+												_1: {
+													ctor: '::',
+													_0: A2(
+														_elm_lang$html$Html$small,
+														{ctor: '[]'},
+														{
+															ctor: '::',
+															_0: _elm_lang$html$Html$text('(closed issues)'),
+															_1: {ctor: '[]'}
+														}),
+													_1: {ctor: '[]'}
+												}
 											}),
 										_1: {
 											ctor: '::',
@@ -14571,6 +14615,15 @@
 										model,
 										{ctor: '[]'});
 								}
+							case 'gh':
+								return A2(
+									_elm_lang$core$Platform_Cmd_ops['!'],
+									model,
+									{
+										ctor: '::',
+										_0: _elm_lang$navigation$Navigation$load(_p54.htmlUrl),
+										_1: {ctor: '[]'}
+									});
 							case 'unstart':
 								var _p52 = _p54.milestone;
 								if (_p52.ctor === 'Just') {
