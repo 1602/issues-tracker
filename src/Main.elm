@@ -110,7 +110,10 @@ loadResource loc user =
                         ]
 
                     Nothing ->
-                        []
+                        [ fetchIssues user.secretKey Current
+                        , fetchIssues user.secretKey Icebox
+                        , fetchMilestones user.secretKey
+                        ]
 
             Nothing ->
                 []
@@ -390,37 +393,40 @@ viewPage user model route =
 
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
+
+        issuesIndex =
+            Html.main_
+                [ style
+                    [ ( "display", "flex" )
+                    , ( "width", "100%" )
+                    ]
+                ]
+                [ Html.section []
+                    [ Html.h3 [] [ text "❄ Icebox" ]
+                    , displayIssues model.iceboxIssues Icebox
+                    ]
+                , Html.section []
+                    [ Html.h3 [] [ text "🚥 Backlog" ]
+                    , displayIssuesWithinMilestones model.milestones IssueOpen
+                    ]
+                , Html.section []
+                    [ Html.h3 [] [ text "🐝 In progress" ]
+                    , displayIssues model.currentIssues Current
+                    ]
+                , Html.section []
+                    [ Html.h3 [] [ text "🎉 Done" ]
+                    , displayIssuesWithinMilestones model.milestones IssueClosed
+                    ]
+                ]
     in
         case route of
             Nothing ->
-                text "404 not found"
+                issuesIndex
 
             Just r ->
                 case r of
                     IssuesIndex ->
-                        Html.main_
-                            [ style
-                                [ ( "display", "flex" )
-                                , ( "width", "100%" )
-                                ]
-                            ]
-                            [ Html.section []
-                                [ Html.h3 [] [ text "❄ Icebox" ]
-                                , displayIssues model.iceboxIssues Icebox
-                                ]
-                            , Html.section []
-                                [ Html.h3 [] [ text "🚥 Backlog" ]
-                                , displayIssuesWithinMilestones model.milestones IssueOpen
-                                ]
-                            , Html.section []
-                                [ Html.h3 [] [ text "🐝 In progress" ]
-                                , displayIssues model.currentIssues Current
-                                ]
-                            , Html.section []
-                                [ Html.h3 [] [ text "🎉 Done" ]
-                                , displayIssuesWithinMilestones model.milestones IssueClosed
-                                ]
-                            ]
+                        issuesIndex
 
 
 listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Html Msg

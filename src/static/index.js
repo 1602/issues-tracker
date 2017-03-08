@@ -7,7 +7,7 @@ try {
     appData = JSON.parse(localStorage.appData);
 } catch(e) {
     appData = { user:
-        { secretKey: ""
+        { secretKey: "b126e40b0cde4ccac36e493ae31147eaee8f68a1"
         , login: "1602"
         , avatar: "https://avatars1.githubusercontent.com/u/184172?v=3&s=40"
         }
