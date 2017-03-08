@@ -385,6 +385,9 @@ update msg model =
                                 Nothing ->
                                     model ! []
 
+                        "gh" ->
+                            model ! [ Navigation.load issue.htmlUrl ]
+
                         "unstart" ->
                             case issue.milestone of
                                 Just m ->
