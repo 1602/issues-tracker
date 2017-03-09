@@ -582,7 +582,10 @@ viewPage user model route =
                                 [ text <|
                                     case s.milestone.dueOn of
                                         Just date ->
-                                            " (due in " ++ (Distance.inWords date model.now) ++ ")"
+                                            if (Date.toTime date) > (Date.toTime model.now) then
+                                                " (due in " ++ (Distance.inWords date model.now) ++ ")"
+                                            else
+                                                " (" ++ (Distance.inWords date model.now) ++ " overdue)"
                                         Nothing ->
                                             " (no due date)"
                                 ]
