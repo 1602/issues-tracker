@@ -12221,6 +12221,7 @@
 		},
 		_elm_lang$core$Json_Decode$int);
 
+	var _moarwick$elm_webpack_starter$Route$MilestonesIndex = {ctor: 'MilestonesIndex'};
 	var _moarwick$elm_webpack_starter$Route$IssuesIndex = {ctor: 'IssuesIndex'};
 	var _moarwick$elm_webpack_starter$Route$route = _evancz$url_parser$UrlParser$oneOf(
 		{
@@ -12229,12 +12230,20 @@
 				_evancz$url_parser$UrlParser$map,
 				_moarwick$elm_webpack_starter$Route$IssuesIndex,
 				_evancz$url_parser$UrlParser$s('issues')),
-			_1: {ctor: '[]'}
+			_1: {
+				ctor: '::',
+				_0: A2(
+					_evancz$url_parser$UrlParser$map,
+					_moarwick$elm_webpack_starter$Route$MilestonesIndex,
+					_evancz$url_parser$UrlParser$s('milestones')),
+				_1: {ctor: '[]'}
+			}
 		});
 	var _moarwick$elm_webpack_starter$Route$parseHash = function (loc) {
 		return A2(_evancz$url_parser$UrlParser$parseHash, _moarwick$elm_webpack_starter$Route$route, loc);
 	};
 
+	var _moarwick$elm_webpack_starter$Messages$DismissPlanningIssue = {ctor: 'DismissPlanningIssue'};
 	var _moarwick$elm_webpack_starter$Messages$SaveAccessToken = {ctor: 'SaveAccessToken'};
 	var _moarwick$elm_webpack_starter$Messages$EditAccessToken = function (a) {
 		return {ctor: 'EditAccessToken', _0: a};
@@ -13606,11 +13615,136 @@
 		});
 	var _moarwick$elm_webpack_starter$Main$viewPage = F3(
 		function (user, model, route) {
+			var milestonesIndex = function () {
+				var _p10 = model.milestones;
+				if (_p10.ctor === 'Just') {
+					return A2(
+						_elm_lang$html$Html$ul,
+						{
+							ctor: '::',
+							_0: _elm_lang$html$Html_Attributes$style(
+								{
+									ctor: '::',
+									_0: {ctor: '_Tuple2', _0: 'zoom', _1: '150%'},
+									_1: {ctor: '[]'}
+								}),
+							_1: {ctor: '[]'}
+						},
+						A2(
+							_elm_lang$core$List$map,
+							function (s) {
+								return A2(
+									_elm_lang$html$Html$li,
+									{
+										ctor: '::',
+										_0: _elm_lang$html$Html_Attributes$style(
+											{
+												ctor: '::',
+												_0: {ctor: '_Tuple2', _0: 'list-style', _1: 'none'},
+												_1: {
+													ctor: '::',
+													_0: {ctor: '_Tuple2', _0: 'padding', _1: '5px'},
+													_1: {
+														ctor: '::',
+														_0: {ctor: '_Tuple2', _0: 'border-bottom', _1: '1px dotted #8f8'},
+														_1: {
+															ctor: '::',
+															_0: {
+																ctor: '_Tuple2',
+																_0: 'border-left',
+																_1: function () {
+																	var _p11 = s.milestone.dueOn;
+																	if (_p11.ctor === 'Just') {
+																		return A2(
+																			_elm_lang$core$Basics_ops['++'],
+																			_elm_lang$core$Basics$toString(
+																				(_elm_lang$core$Time$inHours(
+																					_elm_lang$core$Date$toTime(_p11._0)) / 12) - (_elm_lang$core$Time$inHours(
+																					_elm_lang$core$Date$toTime(model.now)) / 12)),
+																			'px solid rgba(255,255,255,0.1)');
+																	} else {
+																		return '0px';
+																	}
+																}()
+															},
+															_1: {ctor: '[]'}
+														}
+													}
+												}
+											}),
+										_1: {ctor: '[]'}
+									},
+									{
+										ctor: '::',
+										_0: _elm_lang$html$Html$text(
+											A2(_elm_lang$core$Basics_ops['++'], s.milestone.title, ' ')),
+										_1: {
+											ctor: '::',
+											_0: A2(
+												_elm_lang$html$Html$span,
+												{
+													ctor: '::',
+													_0: _elm_lang$html$Html_Attributes$style(
+														{
+															ctor: '::',
+															_0: {ctor: '_Tuple2', _0: 'color', _1: 'grey'},
+															_1: {ctor: '[]'}
+														}),
+													_1: {ctor: '[]'}
+												},
+												{
+													ctor: '::',
+													_0: _elm_lang$html$Html$text(
+														function () {
+															var _p12 = s.milestone.dueOn;
+															if (_p12.ctor === 'Just') {
+																var _p13 = _p12._0;
+																return (_elm_lang$core$Native_Utils.cmp(
+																	_elm_lang$core$Date$toTime(_p13),
+																	_elm_lang$core$Date$toTime(model.now)) > 0) ? A2(
+																	_elm_lang$core$Basics_ops['++'],
+																	' (due in ',
+																	A2(
+																		_elm_lang$core$Basics_ops['++'],
+																		A2(_alpacaaa$elm_date_distance$Date_Distance$inWords, _p13, model.now),
+																		')')) : A2(
+																	_elm_lang$core$Basics_ops['++'],
+																	' (',
+																	A2(
+																		_elm_lang$core$Basics_ops['++'],
+																		A2(_alpacaaa$elm_date_distance$Date_Distance$inWords, _p13, model.now),
+																		' overdue)'));
+															} else {
+																return ' (no due date)';
+															}
+														}()),
+													_1: {ctor: '[]'}
+												}),
+											_1: {ctor: '[]'}
+										}
+									});
+							},
+							A2(
+								_elm_lang$core$List$sortBy,
+								function (s) {
+									var _p14 = s.milestone.dueOn;
+									if (_p14.ctor === 'Just') {
+										return _elm_lang$core$Time$inHours(
+											_elm_lang$core$Date$toTime(_p14._0));
+									} else {
+										return 1 / 0;
+									}
+								},
+								_elm_lang$core$Dict$values(_p10._0))));
+				} else {
+					return _elm_lang$html$Html$text('Loading...');
+				}
+			}();
 			var displayIssues = F2(
 				function (issues, col) {
-					var _p10 = issues;
-					if (_p10.ctor === 'Just') {
-						return A2(_moarwick$elm_webpack_starter$Main$listIssues, _p10._0, col);
+					var _p15 = issues;
+					if (_p15.ctor === 'Just') {
+						return A2(_moarwick$elm_webpack_starter$Main$listIssues, _p15._0, col);
 					} else {
 						return A2(
 							_elm_lang$html$Html$span,
@@ -13628,9 +13762,9 @@
 				});
 			var displayIssuesWithinMilestones = F2(
 				function (milestones, issueState) {
-					var _p11 = milestones;
-					if (_p11.ctor === 'Just') {
-						return A3(_moarwick$elm_webpack_starter$Main$listIssuesWithinMilestones, _p11._0, issueState, model.now);
+					var _p16 = milestones;
+					if (_p16.ctor === 'Just') {
+						return A3(_moarwick$elm_webpack_starter$Main$listIssuesWithinMilestones, _p16._0, issueState, model.now);
 					} else {
 						return A2(
 							_elm_lang$html$Html$span,
@@ -13795,18 +13929,22 @@
 						}
 					}
 				});
-			var _p12 = route;
-			if (_p12.ctor === 'Nothing') {
+			var _p17 = route;
+			if (_p17.ctor === 'Nothing') {
 				return issuesIndex;
 			} else {
-				var _p13 = _p12._0;
-				return issuesIndex;
+				var _p18 = _p17._0;
+				if (_p18.ctor === 'IssuesIndex') {
+					return issuesIndex;
+				} else {
+					return milestonesIndex;
+				}
 			}
 		});
 	var _moarwick$elm_webpack_starter$Main$view = function (model) {
 		var error = function () {
-			var _p14 = model.error;
-			if (_p14.ctor === 'Just') {
+			var _p19 = model.error;
+			if (_p19.ctor === 'Just') {
 				return A2(
 					_elm_lang$html$Html$div,
 					{
@@ -13849,15 +13987,15 @@
 					},
 					{
 						ctor: '::',
-						_0: _elm_lang$html$Html$text(_p14._0),
+						_0: _elm_lang$html$Html$text(_p19._0),
 						_1: {ctor: '[]'}
 					});
 			} else {
 				return _elm_lang$html$Html$text('');
 			}
 		}();
-		var _p15 = model.user;
-		if (_p15.ctor === 'Just') {
+		var _p20 = model.user;
+		if (_p20.ctor === 'Just') {
 			return A2(
 				_elm_lang$html$Html$div,
 				{ctor: '[]'},
@@ -13865,7 +14003,7 @@
 					ctor: '::',
 					_0: A3(
 						_moarwick$elm_webpack_starter$Main$viewPage,
-						_p15._0,
+						_p20._0,
 						model,
 						_moarwick$elm_webpack_starter$Route$parseHash(model.location)),
 					_1: {
@@ -13874,8 +14012,9 @@
 						_1: {
 							ctor: '::',
 							_0: function () {
-								var _p16 = model.pickMilestoneForIssue;
-								if (_p16.ctor === 'Just') {
+								var _p21 = model.pickMilestoneForIssue;
+								if (_p21.ctor === 'Just') {
+									var _p22 = _p21._0;
 									return A2(
 										_elm_lang$html$Html$div,
 										{
@@ -13886,17 +14025,29 @@
 													_0: {ctor: '_Tuple2', _0: 'position', _1: 'fixed'},
 													_1: {
 														ctor: '::',
-														_0: {ctor: '_Tuple2', _0: 'top', _1: '10px'},
+														_0: {ctor: '_Tuple2', _0: 'top', _1: '70px'},
 														_1: {
 															ctor: '::',
-															_0: {ctor: '_Tuple2', _0: 'left', _1: '10px'},
+															_0: {ctor: '_Tuple2', _0: 'left', _1: '50%'},
 															_1: {
 																ctor: '::',
-																_0: {ctor: '_Tuple2', _0: 'padding', _1: '10px'},
+																_0: {ctor: '_Tuple2', _0: 'margin-left', _1: '-200px'},
 																_1: {
 																	ctor: '::',
-																	_0: {ctor: '_Tuple2', _0: 'background', _1: 'black'},
-																	_1: {ctor: '[]'}
+																	_0: {ctor: '_Tuple2', _0: 'width', _1: '400px'},
+																	_1: {
+																		ctor: '::',
+																		_0: {ctor: '_Tuple2', _0: 'padding', _1: '10px'},
+																		_1: {
+																			ctor: '::',
+																			_0: {ctor: '_Tuple2', _0: 'background', _1: '#777'},
+																			_1: {
+																				ctor: '::',
+																				_0: {ctor: '_Tuple2', _0: 'border', _1: '2px solid #bbb'},
+																				_1: {ctor: '[]'}
+																			}
+																		}
+																	}
 																}
 															}
 														}
@@ -13907,35 +14058,101 @@
 										{
 											ctor: '::',
 											_0: A2(
-												_elm_lang$html$Html$ul,
+												_elm_lang$html$Html$div,
 												{ctor: '[]'},
-												A2(
-													_elm_lang$core$List$map,
-													function (s) {
-														return A2(
-															_elm_lang$html$Html$li,
+												{
+													ctor: '::',
+													_0: _elm_lang$html$Html$text('Select milestone for issue '),
+													_1: {ctor: '[]'}
+												}),
+											_1: {
+												ctor: '::',
+												_0: A2(
+													_elm_lang$html$Html$strong,
+													{ctor: '[]'},
+													{
+														ctor: '::',
+														_0: _elm_lang$html$Html$text(
+															A2(_elm_lang$core$Basics_ops['++'], '#', _p22.number)),
+														_1: {ctor: '[]'}
+													}),
+												_1: {
+													ctor: '::',
+													_0: _elm_lang$html$Html$text(
+														A2(_elm_lang$core$Basics_ops['++'], ' ', _p22.title)),
+													_1: {
+														ctor: '::',
+														_0: A2(
+															_elm_lang$html$Html$hr,
 															{ctor: '[]'},
-															{
+															{ctor: '[]'}),
+														_1: {
+															ctor: '::',
+															_0: A2(
+																_elm_lang$html$Html$ul,
+																{ctor: '[]'},
+																A2(
+																	_elm_lang$core$List$map,
+																	function (s) {
+																		return A2(
+																			_elm_lang$html$Html$li,
+																			{
+																				ctor: '::',
+																				_0: _elm_lang$html$Html_Attributes$style(
+																					{
+																						ctor: '::',
+																						_0: {ctor: '_Tuple2', _0: 'list-style', _1: 'none'},
+																						_1: {ctor: '[]'}
+																					}),
+																				_1: {ctor: '[]'}
+																			},
+																			{
+																				ctor: '::',
+																				_0: A2(
+																					_elm_lang$html$Html$button,
+																					{
+																						ctor: '::',
+																						_0: _elm_lang$html$Html_Events$onClick(
+																							A2(_moarwick$elm_webpack_starter$Messages$SetMilestone, _p22, s.milestone)),
+																						_1: {ctor: '[]'}
+																					},
+																					{
+																						ctor: '::',
+																						_0: _elm_lang$html$Html$text(s.milestone.title),
+																						_1: {ctor: '[]'}
+																					}),
+																				_1: {ctor: '[]'}
+																			});
+																	},
+																	_elm_lang$core$Dict$values(
+																		A2(_elm_lang$core$Maybe$withDefault, _elm_lang$core$Dict$empty, model.milestones)))),
+															_1: {
 																ctor: '::',
 																_0: A2(
-																	_elm_lang$html$Html$button,
-																	{
-																		ctor: '::',
-																		_0: _elm_lang$html$Html_Events$onClick(
-																			A2(_moarwick$elm_webpack_starter$Messages$SetMilestone, _p16._0, s.milestone)),
-																		_1: {ctor: '[]'}
-																	},
-																	{
-																		ctor: '::',
-																		_0: _elm_lang$html$Html$text(s.milestone.title),
-																		_1: {ctor: '[]'}
-																	}),
-																_1: {ctor: '[]'}
-															});
-													},
-													_elm_lang$core$Dict$values(
-														A2(_elm_lang$core$Maybe$withDefault, _elm_lang$core$Dict$empty, model.milestones)))),
-											_1: {ctor: '[]'}
+																	_elm_lang$html$Html$hr,
+																	{ctor: '[]'},
+																	{ctor: '[]'}),
+																_1: {
+																	ctor: '::',
+																	_0: A2(
+																		_elm_lang$html$Html$button,
+																		{
+																			ctor: '::',
+																			_0: _elm_lang$html$Html_Events$onClick(_moarwick$elm_webpack_starter$Messages$DismissPlanningIssue),
+																			_1: {ctor: '[]'}
+																		},
+																		{
+																			ctor: '::',
+																			_0: _elm_lang$html$Html$text('Dismiss'),
+																			_1: {ctor: '[]'}
+																		}),
+																	_1: {ctor: '[]'}
+																}
+															}
+														}
+													}
+												}
+											}
 										});
 								} else {
 									return _elm_lang$html$Html$text('');
@@ -13986,15 +14203,15 @@
 		return _elm_lang$core$Platform_Sub$batch(
 			{
 				ctor: '::',
-				_0: A2(_elm_lang$core$Time$every, 30 * _elm_lang$core$Time$second, _moarwick$elm_webpack_starter$Messages$CurrentTime),
+				_0: A2(_elm_lang$core$Time$every, 60 * _elm_lang$core$Time$second, _moarwick$elm_webpack_starter$Messages$CurrentTime),
 				_1: {ctor: '[]'}
 			});
 	};
 	var _moarwick$elm_webpack_starter$Main$save = F3(
 		function (result, model, fn) {
-			var _p17 = result;
-			if (_p17.ctor === 'Ok') {
-				var m = fn(_p17._0);
+			var _p23 = result;
+			if (_p23.ctor === 'Ok') {
+				var m = fn(_p23._0);
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
 					_elm_lang$core$Native_Utils.update(
@@ -14008,46 +14225,41 @@
 						model,
 						{
 							error: _elm_lang$core$Maybe$Just(
-								_elm_lang$core$Basics$toString(_p17._0))
+								_elm_lang$core$Basics$toString(_p23._0))
 						}),
 					{ctor: '[]'});
 			}
 		});
+	var _moarwick$elm_webpack_starter$Main$loadAllIssues = function (accessToken) {
+		return {
+			ctor: '::',
+			_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, accessToken, _moarwick$elm_webpack_starter$Models$Current),
+			_1: {
+				ctor: '::',
+				_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, accessToken, _moarwick$elm_webpack_starter$Models$Icebox),
+				_1: {
+					ctor: '::',
+					_0: _moarwick$elm_webpack_starter$Services$fetchMilestones(accessToken),
+					_1: {ctor: '[]'}
+				}
+			}
+		};
+	};
 	var _moarwick$elm_webpack_starter$Main$loadResource = F2(
 		function (loc, user) {
 			var page = _moarwick$elm_webpack_starter$Route$parseHash(loc);
-			var _p18 = user;
-			if (_p18.ctor === 'Just') {
-				var _p20 = _p18._0;
-				var _p19 = page;
-				if (_p19.ctor === 'Just') {
-					return {
-						ctor: '::',
-						_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p20.secretKey, _moarwick$elm_webpack_starter$Models$Current),
-						_1: {
-							ctor: '::',
-							_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p20.secretKey, _moarwick$elm_webpack_starter$Models$Icebox),
-							_1: {
-								ctor: '::',
-								_0: _moarwick$elm_webpack_starter$Services$fetchMilestones(_p20.secretKey),
-								_1: {ctor: '[]'}
-							}
-						}
-					};
+			var _p24 = user;
+			if (_p24.ctor === 'Just') {
+				var _p26 = _p24._0;
+				var _p25 = page;
+				if (_p25.ctor === 'Just') {
+					if (_p25._0.ctor === 'IssuesIndex') {
+						return _moarwick$elm_webpack_starter$Main$loadAllIssues(_p26.secretKey);
+					} else {
+						return _moarwick$elm_webpack_starter$Main$loadAllIssues(_p26.secretKey);
+					}
 				} else {
-					return {
-						ctor: '::',
-						_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p20.secretKey, _moarwick$elm_webpack_starter$Models$Current),
-						_1: {
-							ctor: '::',
-							_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p20.secretKey, _moarwick$elm_webpack_starter$Models$Icebox),
-							_1: {
-								ctor: '::',
-								_0: _moarwick$elm_webpack_starter$Services$fetchMilestones(_p20.secretKey),
-								_1: {ctor: '[]'}
-							}
-						}
-					};
+					return _moarwick$elm_webpack_starter$Main$loadAllIssues(_p26.secretKey);
 				}
 			} else {
 				return {ctor: '[]'};
@@ -14056,8 +14268,8 @@
 	var _moarwick$elm_webpack_starter$Main$aboutToLoadResource = F2(
 		function (loc, model) {
 			var page = _moarwick$elm_webpack_starter$Route$parseHash(loc);
-			var _p21 = page;
-			if (_p21.ctor === 'Just') {
+			var _p27 = page;
+			if ((_p27.ctor === 'Just') && (_p27._0.ctor === 'IssuesIndex')) {
 				return _elm_lang$core$Native_Utils.update(
 					model,
 					{
@@ -14083,8 +14295,8 @@
 		});
 	var _moarwick$elm_webpack_starter$Main$update = F2(
 		function (msg, model) {
-			var _p22 = msg;
-			switch (_p22.ctor) {
+			var _p28 = msg;
+			switch (_p28.ctor) {
 				case 'NoOp':
 					return A2(
 						_elm_lang$core$Platform_Cmd_ops['!'],
@@ -14096,7 +14308,7 @@
 						_elm_lang$core$Native_Utils.update(
 							model,
 							{
-								token: _elm_lang$core$Maybe$Just(_p22._0)
+								token: _elm_lang$core$Maybe$Just(_p28._0)
 							}),
 						{ctor: '[]'});
 				case 'SaveAccessToken':
@@ -14122,7 +14334,7 @@
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						_elm_lang$core$Native_Utils.update(
 							model,
-							{now: _p22._0}),
+							{now: _p28._0}),
 						{ctor: '[]'});
 				case 'CurrentTime':
 					return A2(
@@ -14130,34 +14342,41 @@
 						_elm_lang$core$Native_Utils.update(
 							model,
 							{
-								now: _elm_lang$core$Date$fromTime(_p22._0)
+								now: _elm_lang$core$Date$fromTime(_p28._0)
 							}),
-						{ctor: '[]'});
+						function () {
+							var _p29 = model.user;
+							if (_p29.ctor === 'Just') {
+								return _moarwick$elm_webpack_starter$Main$loadAllIssues(_p29._0.secretKey);
+							} else {
+								return {ctor: '[]'};
+							}
+						}());
 				case 'UrlChange':
-					var _p23 = _p22._0;
+					var _p30 = _p28._0;
 					return A2(
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						A2(
 							_moarwick$elm_webpack_starter$Main$aboutToLoadResource,
-							_p23,
+							_p30,
 							_elm_lang$core$Native_Utils.update(
 								model,
-								{location: _p23})),
-						A2(_moarwick$elm_webpack_starter$Main$loadResource, _p23, model.user));
+								{location: _p30})),
+						A2(_moarwick$elm_webpack_starter$Main$loadResource, _p30, model.user));
 				case 'MilestoneIssuesLoaded':
-					var _p24 = _p22._2;
-					if (_p24.ctor === 'Err') {
+					var _p31 = _p28._2;
+					if (_p31.ctor === 'Err') {
 						return A2(
 							_elm_lang$core$Platform_Cmd_ops['!'],
 							_elm_lang$core$Native_Utils.update(
 								model,
 								{
 									error: _elm_lang$core$Maybe$Just(
-										_elm_lang$core$Basics$toString(_p24._0))
+										_elm_lang$core$Basics$toString(_p31._0))
 								}),
 							{ctor: '[]'});
 					} else {
-						var _p28 = _p24._0;
+						var _p35 = _p31._0;
 						return A2(
 							_elm_lang$core$Platform_Cmd_ops['!'],
 							_elm_lang$core$Native_Utils.update(
@@ -14166,25 +14385,25 @@
 									milestones: _elm_lang$core$Maybe$Just(
 										A3(
 											_elm_lang$core$Dict$update,
-											_p22._0,
+											_p28._0,
 											function (s) {
-												var _p25 = s;
-												if (_p25.ctor === 'Just') {
-													var _p27 = _p25._0;
-													var _p26 = _p22._1;
-													if (_p26.ctor === 'IssueOpen') {
+												var _p32 = s;
+												if (_p32.ctor === 'Just') {
+													var _p34 = _p32._0;
+													var _p33 = _p28._1;
+													if (_p33.ctor === 'IssueOpen') {
 														return _elm_lang$core$Maybe$Just(
 															_elm_lang$core$Native_Utils.update(
-																_p27,
+																_p34,
 																{
-																	openIssues: _elm_lang$core$Maybe$Just(_p28)
+																	openIssues: _elm_lang$core$Maybe$Just(_p35)
 																}));
 													} else {
 														return _elm_lang$core$Maybe$Just(
 															_elm_lang$core$Native_Utils.update(
-																_p27,
+																_p34,
 																{
-																	closedIssues: _elm_lang$core$Maybe$Just(_p28)
+																	closedIssues: _elm_lang$core$Maybe$Just(_p35)
 																}));
 													}
 												} else {
@@ -14196,19 +14415,19 @@
 							{ctor: '[]'});
 					}
 				case 'LoadMilestones':
-					var _p29 = _p22._0;
-					if (_p29.ctor === 'Err') {
+					var _p36 = _p28._0;
+					if (_p36.ctor === 'Err') {
 						return A2(
 							_elm_lang$core$Platform_Cmd_ops['!'],
 							_elm_lang$core$Native_Utils.update(
 								model,
 								{
 									error: _elm_lang$core$Maybe$Just(
-										_elm_lang$core$Basics$toString(_p29._0))
+										_elm_lang$core$Basics$toString(_p36._0))
 								}),
 							{ctor: '[]'});
 					} else {
-						var _p32 = _p29._0;
+						var _p40 = _p36._0;
 						return A2(
 							_elm_lang$core$Platform_Cmd_ops['!'],
 							_elm_lang$core$Native_Utils.update(
@@ -14219,28 +14438,40 @@
 											_elm_lang$core$List$foldl,
 											function (ms) {
 												return A2(
-													_elm_lang$core$Dict$insert,
+													_elm_lang$core$Dict$update,
 													ms.number,
-													A3(_moarwick$elm_webpack_starter$Models$ExpandedMilestone, ms, _elm_lang$core$Maybe$Nothing, _elm_lang$core$Maybe$Nothing));
+													function (m) {
+														return _elm_lang$core$Maybe$Just(
+															function () {
+																var _p37 = m;
+																if (_p37.ctor === 'Just') {
+																	return _elm_lang$core$Native_Utils.update(
+																		_p37._0,
+																		{milestone: ms});
+																} else {
+																	return A3(_moarwick$elm_webpack_starter$Models$ExpandedMilestone, ms, _elm_lang$core$Maybe$Nothing, _elm_lang$core$Maybe$Nothing);
+																}
+															}());
+													});
 											},
-											_elm_lang$core$Dict$empty,
-											_p32)),
+											A2(_elm_lang$core$Maybe$withDefault, _elm_lang$core$Dict$empty, model.milestones),
+											_p40)),
 									error: _elm_lang$core$Maybe$Nothing
 								}),
 							function () {
-								var _p30 = model.user;
-								if (_p30.ctor === 'Just') {
-									var _p31 = _p30._0;
+								var _p38 = model.user;
+								if (_p38.ctor === 'Just') {
+									var _p39 = _p38._0;
 									return A2(
 										_elm_lang$core$Basics_ops['++'],
 										A2(
 											_elm_lang$core$List$map,
-											A2(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p31.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen),
-											_p32),
+											A2(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p39.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen),
+											_p40),
 										A2(
 											_elm_lang$core$List$map,
-											A2(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p31.secretKey, _moarwick$elm_webpack_starter$Models$IssueClosed),
-											_p32));
+											A2(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p39.secretKey, _moarwick$elm_webpack_starter$Models$IssueClosed),
+											_p40));
 								} else {
 									return {ctor: '[]'};
 								}
@@ -14249,11 +14480,11 @@
 				case 'IssuesLoaded':
 					return A3(
 						_moarwick$elm_webpack_starter$Main$save,
-						_p22._1,
+						_p28._1,
 						model,
 						function (a) {
-							var _p33 = _p22._0;
-							switch (_p33.ctor) {
+							var _p41 = _p28._0;
+							switch (_p41.ctor) {
 								case 'Current':
 									return _elm_lang$core$Native_Utils.update(
 										model,
@@ -14282,7 +14513,7 @@
 						model,
 						{
 							ctor: '::',
-							_0: _moarwick$elm_webpack_starter$Main$clipboard(_p22._0),
+							_0: _moarwick$elm_webpack_starter$Main$clipboard(_p28._0),
 							_1: {ctor: '[]'}
 						});
 				case 'UnsetMilestone':
@@ -14290,15 +14521,15 @@
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						model,
 						function () {
-							var _p34 = model.user;
-							if (_p34.ctor === 'Just') {
-								var _p35 = _p34._0;
+							var _p42 = model.user;
+							if (_p42.ctor === 'Just') {
+								var _p43 = _p42._0;
 								return {
 									ctor: '::',
-									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p35.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen, _p22._0),
+									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p43.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen, _p28._0),
 									_1: {
 										ctor: '::',
-										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p35.secretKey, _moarwick$elm_webpack_starter$Models$Icebox),
+										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p43.secretKey, _moarwick$elm_webpack_starter$Models$Icebox),
 										_1: {ctor: '[]'}
 									}
 								};
@@ -14307,9 +14538,9 @@
 							}
 						}());
 				case 'SetMilestone':
-					var _p37 = _p22._1;
-					var _p36 = model.user;
-					if (_p36.ctor === 'Just') {
+					var _p45 = _p28._1;
+					var _p44 = model.user;
+					if (_p44.ctor === 'Just') {
 						return A2(
 							_elm_lang$core$Platform_Cmd_ops['!'],
 							_elm_lang$core$Native_Utils.update(
@@ -14319,7 +14550,7 @@
 								ctor: '::',
 								_0: A4(
 									_moarwick$elm_webpack_starter$Services$updateIssueWith,
-									_p22._0.number,
+									_p28._0.number,
 									_elm_lang$core$Json_Encode$object(
 										{
 											ctor: '::',
@@ -14331,12 +14562,12 @@
 														_elm_lang$core$Maybe$withDefault,
 														0,
 														_elm_lang$core$Result$toMaybe(
-															_elm_lang$core$String$toInt(_p37.number))))
+															_elm_lang$core$String$toInt(_p45.number))))
 											},
 											_1: {ctor: '[]'}
 										}),
-									_p36._0.secretKey,
-									_moarwick$elm_webpack_starter$Messages$MilestoneSet(_p37)),
+									_p44._0.secretKey,
+									_moarwick$elm_webpack_starter$Messages$MilestoneSet(_p45)),
 								_1: {ctor: '[]'}
 							});
 					} else {
@@ -14350,15 +14581,15 @@
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						model,
 						function () {
-							var _p38 = model.user;
-							if (_p38.ctor === 'Just') {
-								var _p39 = _p38._0;
+							var _p46 = model.user;
+							if (_p46.ctor === 'Just') {
+								var _p47 = _p46._0;
 								return {
 									ctor: '::',
-									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p39.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen, _p22._0),
+									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p47.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen, _p28._0),
 									_1: {
 										ctor: '::',
-										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p39.secretKey, _moarwick$elm_webpack_starter$Models$Icebox),
+										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p47.secretKey, _moarwick$elm_webpack_starter$Models$Icebox),
 										_1: {ctor: '[]'}
 									}
 								};
@@ -14371,15 +14602,15 @@
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						model,
 						function () {
-							var _p40 = model.user;
-							if (_p40.ctor === 'Just') {
-								var _p41 = _p40._0;
+							var _p48 = model.user;
+							if (_p48.ctor === 'Just') {
+								var _p49 = _p48._0;
 								return {
 									ctor: '::',
-									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p41.secretKey, _moarwick$elm_webpack_starter$Models$IssueClosed, _p22._0),
+									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p49.secretKey, _moarwick$elm_webpack_starter$Models$IssueClosed, _p28._0),
 									_1: {
 										ctor: '::',
-										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p41.secretKey, _moarwick$elm_webpack_starter$Models$Current),
+										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p49.secretKey, _moarwick$elm_webpack_starter$Models$Current),
 										_1: {ctor: '[]'}
 									}
 								};
@@ -14392,15 +14623,15 @@
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						model,
 						function () {
-							var _p42 = model.user;
-							if (_p42.ctor === 'Just') {
-								var _p43 = _p42._0;
+							var _p50 = model.user;
+							if (_p50.ctor === 'Just') {
+								var _p51 = _p50._0;
 								return {
 									ctor: '::',
-									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p43.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen, _p22._0),
+									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p51.secretKey, _moarwick$elm_webpack_starter$Models$IssueOpen, _p28._0),
 									_1: {
 										ctor: '::',
-										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p43.secretKey, _moarwick$elm_webpack_starter$Models$Current),
+										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p51.secretKey, _moarwick$elm_webpack_starter$Models$Current),
 										_1: {ctor: '[]'}
 									}
 								};
@@ -14413,15 +14644,15 @@
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						model,
 						function () {
-							var _p44 = model.user;
-							if (_p44.ctor === 'Just') {
-								var _p45 = _p44._0;
+							var _p52 = model.user;
+							if (_p52.ctor === 'Just') {
+								var _p53 = _p52._0;
 								return {
 									ctor: '::',
-									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p45.secretKey, _moarwick$elm_webpack_starter$Models$IssueClosed, _p22._0),
+									_0: A3(_moarwick$elm_webpack_starter$Services$fetchMilestoneIssues, _p53.secretKey, _moarwick$elm_webpack_starter$Models$IssueClosed, _p28._0),
 									_1: {
 										ctor: '::',
-										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p45.secretKey, _moarwick$elm_webpack_starter$Models$Current),
+										_0: A2(_moarwick$elm_webpack_starter$Services$fetchIssues, _p53.secretKey, _moarwick$elm_webpack_starter$Models$Current),
 										_1: {ctor: '[]'}
 									}
 								};
@@ -14429,16 +14660,23 @@
 								return {ctor: '[]'};
 							}
 						}());
+				case 'DismissPlanningIssue':
+					return A2(
+						_elm_lang$core$Platform_Cmd_ops['!'],
+						_elm_lang$core$Native_Utils.update(
+							model,
+							{pickMilestoneForIssue: _elm_lang$core$Maybe$Nothing}),
+						{ctor: '[]'});
 				default:
-					var _p54 = _p22._0;
-					var _p46 = model.user;
-					if (_p46.ctor === 'Just') {
-						var _p53 = _p46._0;
-						var _p47 = _p22._1;
-						switch (_p47) {
+					var _p62 = _p28._0;
+					var _p54 = model.user;
+					if (_p54.ctor === 'Just') {
+						var _p61 = _p54._0;
+						var _p55 = _p28._1;
+						switch (_p55) {
 							case 'unplan':
-								var _p48 = _p54.milestone;
-								if (_p48.ctor === 'Just') {
+								var _p56 = _p62.milestone;
+								if (_p56.ctor === 'Just') {
 									return A2(
 										_elm_lang$core$Platform_Cmd_ops['!'],
 										model,
@@ -14446,9 +14684,9 @@
 											ctor: '::',
 											_0: A3(
 												_moarwick$elm_webpack_starter$Services$updateIssue,
-												_p54,
-												_p53.secretKey,
-												_moarwick$elm_webpack_starter$Messages$UnsetMilestone(_p48._0)),
+												_p62,
+												_p61.secretKey,
+												_moarwick$elm_webpack_starter$Messages$UnsetMilestone(_p56._0)),
 											_1: {ctor: '[]'}
 										});
 								} else {
@@ -14458,8 +14696,8 @@
 										{ctor: '[]'});
 								}
 							case 'start':
-								var _p49 = _p54.milestone;
-								if (_p49.ctor === 'Just') {
+								var _p57 = _p62.milestone;
+								if (_p57.ctor === 'Just') {
 									return A2(
 										_elm_lang$core$Platform_Cmd_ops['!'],
 										model,
@@ -14467,7 +14705,7 @@
 											ctor: '::',
 											_0: A4(
 												_moarwick$elm_webpack_starter$Services$updateIssueWith,
-												_p54.number,
+												_p62.number,
 												_elm_lang$core$Json_Encode$object(
 													{
 														ctor: '::',
@@ -14489,12 +14727,12 @@
 																			function (_) {
 																				return _.name;
 																			},
-																			_p54.labels))))
+																			_p62.labels))))
 														},
 														_1: {ctor: '[]'}
 													}),
-												_p53.secretKey,
-												_moarwick$elm_webpack_starter$Messages$IssueStarted(_p49._0)),
+												_p61.secretKey,
+												_moarwick$elm_webpack_starter$Messages$IssueStarted(_p57._0)),
 											_1: {ctor: '[]'}
 										});
 								} else {
@@ -14504,8 +14742,8 @@
 										{ctor: '[]'});
 								}
 							case 'finish':
-								var _p50 = _p54.milestone;
-								if (_p50.ctor === 'Just') {
+								var _p58 = _p62.milestone;
+								if (_p58.ctor === 'Just') {
 									return A2(
 										_elm_lang$core$Platform_Cmd_ops['!'],
 										model,
@@ -14513,7 +14751,7 @@
 											ctor: '::',
 											_0: A4(
 												_moarwick$elm_webpack_starter$Services$updateIssueWith,
-												_p54.number,
+												_p62.number,
 												_elm_lang$core$Json_Encode$object(
 													{
 														ctor: '::',
@@ -14534,7 +14772,7 @@
 																			function (_) {
 																				return _.name;
 																			},
-																			_p54.labels))))
+																			_p62.labels))))
 														},
 														_1: {
 															ctor: '::',
@@ -14546,8 +14784,8 @@
 															_1: {ctor: '[]'}
 														}
 													}),
-												_p53.secretKey,
-												_moarwick$elm_webpack_starter$Messages$IssueFinished(_p50._0)),
+												_p61.secretKey,
+												_moarwick$elm_webpack_starter$Messages$IssueFinished(_p58._0)),
 											_1: {ctor: '[]'}
 										});
 								} else {
@@ -14557,8 +14795,8 @@
 										{ctor: '[]'});
 								}
 							case 'reopen':
-								var _p51 = _p54.milestone;
-								if (_p51.ctor === 'Just') {
+								var _p59 = _p62.milestone;
+								if (_p59.ctor === 'Just') {
 									return A2(
 										_elm_lang$core$Platform_Cmd_ops['!'],
 										model,
@@ -14566,7 +14804,7 @@
 											ctor: '::',
 											_0: A4(
 												_moarwick$elm_webpack_starter$Services$updateIssueWith,
-												_p54.number,
+												_p62.number,
 												_elm_lang$core$Json_Encode$object(
 													{
 														ctor: '::',
@@ -14593,7 +14831,7 @@
 																				function (_) {
 																					return _.name;
 																				},
-																				_p54.labels)))))
+																				_p62.labels)))))
 														},
 														_1: {
 															ctor: '::',
@@ -14605,8 +14843,8 @@
 															_1: {ctor: '[]'}
 														}
 													}),
-												_p53.secretKey,
-												_moarwick$elm_webpack_starter$Messages$IssueRestarted(_p51._0)),
+												_p61.secretKey,
+												_moarwick$elm_webpack_starter$Messages$IssueRestarted(_p59._0)),
 											_1: {ctor: '[]'}
 										});
 								} else {
@@ -14621,12 +14859,12 @@
 									model,
 									{
 										ctor: '::',
-										_0: _elm_lang$navigation$Navigation$load(_p54.htmlUrl),
+										_0: _elm_lang$navigation$Navigation$load(_p62.htmlUrl),
 										_1: {ctor: '[]'}
 									});
 							case 'unstart':
-								var _p52 = _p54.milestone;
-								if (_p52.ctor === 'Just') {
+								var _p60 = _p62.milestone;
+								if (_p60.ctor === 'Just') {
 									return A2(
 										_elm_lang$core$Platform_Cmd_ops['!'],
 										model,
@@ -14634,7 +14872,7 @@
 											ctor: '::',
 											_0: A4(
 												_moarwick$elm_webpack_starter$Services$updateIssueWith,
-												_p54.number,
+												_p62.number,
 												_elm_lang$core$Json_Encode$object(
 													{
 														ctor: '::',
@@ -14655,12 +14893,12 @@
 																			function (_) {
 																				return _.name;
 																			},
-																			_p54.labels))))
+																			_p62.labels))))
 														},
 														_1: {ctor: '[]'}
 													}),
-												_p53.secretKey,
-												_moarwick$elm_webpack_starter$Messages$IssueStarted(_p52._0)),
+												_p61.secretKey,
+												_moarwick$elm_webpack_starter$Messages$IssueStarted(_p60._0)),
 											_1: {ctor: '[]'}
 										});
 								} else {
@@ -14675,7 +14913,7 @@
 									_elm_lang$core$Native_Utils.update(
 										model,
 										{
-											pickMilestoneForIssue: _elm_lang$core$Maybe$Just(_p54)
+											pickMilestoneForIssue: _elm_lang$core$Maybe$Just(_p62)
 										}),
 									{ctor: '[]'});
 							default:
@@ -14728,8 +14966,8 @@
 						_1: {
 							ctor: '::',
 							_0: function () {
-								var _p55 = persistentData.user;
-								if (_p55.ctor === 'Just') {
+								var _p63 = persistentData.user;
+								if (_p63.ctor === 'Just') {
 									return _elm_lang$core$Platform_Cmd$none;
 								} else {
 									return _elm_lang$core$Platform_Cmd$none;
