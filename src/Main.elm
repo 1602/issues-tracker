@@ -92,7 +92,7 @@ aboutToLoadResource loc model =
             Just IssuesIndex ->
                 { model | iceboxIssues = Just [] }
 
-            Nothing ->
+            _ ->
                 model
 
 loadAllIssues : String -> List (Cmd Msg)
@@ -112,6 +112,9 @@ loadResource loc user =
             Just user ->
                 case page of
                     Just IssuesIndex ->
+                        loadAllIssues user.secretKey
+
+                    Just MilestonesIndex ->
                         loadAllIssues user.secretKey
 
                     Nothing ->
@@ -327,6 +330,9 @@ update msg model =
                     []
                     )
 
+        DismissPlanningIssue ->
+            { model | pickMilestoneForIssue = Nothing } ! []
+
         IssueAction issue action ->
             case model.user of
                 Just user ->
@@ -490,19 +496,28 @@ view model =
                         Just issue ->
                             div [ style
                                 [ ( "position", "fixed" )
-                                , ( "top", "10px" )
-                                , ( "left", "10px" )
+                                , ( "top", "70px" )
+                                , ( "left", "50%" )
+                                , ( "margin-left", "-200px" )
+                                , ( "width", "400px" )
                                 , ( "padding", "10px" )
-                                , ( "background", "black" )
+                                , ( "background", "#777" )
+                                , ( "border", "2px solid #bbb" )
                                 ]
-                                ] [
-                                    model.milestones
+                                ]
+                                [ div [] [ text "Select milestone for issue " ]
+                                , Html.strong [] [ text <| "#" ++ issue.number ]
+                                , text <| " " ++ issue.title
+                                , Html.hr [] []
+                                , model.milestones
                                         |> Maybe.withDefault Dict.empty
                                         |> Dict.values
                                         |> List.map (\s ->
-                                            Html.li [] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
+                                            Html.li [ style [ ("list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
                                             )
                                         |> Html.ul []
+                                , Html.hr [] []
+                                , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
                                 ]
 
                         Nothing ->
@@ -535,6 +550,48 @@ viewPage user model route =
 
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
+
+        milestonesIndex =
+            case model.milestones of
+                Just milestones ->
+                    milestones
+                        |> Dict.values
+                        |> List.sortBy (\s -> case s.milestone.dueOn of
+                            Just date ->
+                                Date.toTime date |> Time.inHours
+                            Nothing ->
+                                1/0
+                        )
+                        |> List.map (\s -> Html.li
+                            [ style
+                                [ ("list-style", "none")
+                                , ("padding", "5px")
+                                , ( "border-bottom", "1px dotted #8f8" )
+                                , ("border-left", case s.milestone.dueOn of
+                                    Just date ->
+                                        (toString
+                                            (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
+                                            ) ++ "px solid rgba(255,255,255,0.1)"
+                                    Nothing ->
+                                        "0px"
+                                )
+                                ]
+                            ]
+                            [ text <| s.milestone.title ++ " "
+                            , Html.span [ style [("color", "grey")] ]
+                                [ text <|
+                                    case s.milestone.dueOn of
+                                        Just date ->
+                                            " (due in " ++ (Distance.inWords date model.now) ++ ")"
+                                        Nothing ->
+                                            " (no due date)"
+                                ]
+                            ]
+                            )
+                        |> Html.ul [ style [ ("zoom", "150%")] ]
+
+                Nothing ->
+                    text "Loading..."
 
         issuesIndex =
             Html.main_
@@ -569,6 +626,9 @@ viewPage user model route =
                 case r of
                     IssuesIndex ->
                         issuesIndex
+
+                    MilestonesIndex ->
+                        milestonesIndex
 
 
 listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Html Msg

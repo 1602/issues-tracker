@@ -6,12 +6,14 @@ import Navigation exposing (Location)
 
 type Route
     = IssuesIndex
+    | MilestonesIndex
 
 
 route : Parser (Route -> a) a
 route =
     oneOf
         [ map IssuesIndex (s "issues")
+        , map MilestonesIndex (s "milestones")
         ]
 
 parseHash : Location -> Maybe Route

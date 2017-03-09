@@ -25,4 +25,5 @@ type Msg
     | CopyText String
     | EditAccessToken String
     | SaveAccessToken
+    | DismissPlanningIssue
 
