@@ -13646,28 +13646,32 @@
 													_0: {ctor: '_Tuple2', _0: 'padding', _1: '5px'},
 													_1: {
 														ctor: '::',
-														_0: {ctor: '_Tuple2', _0: 'border-bottom', _1: '1px dotted #8f8'},
+														_0: {ctor: '_Tuple2', _0: 'margin', _1: '2px'},
 														_1: {
 															ctor: '::',
-															_0: {
-																ctor: '_Tuple2',
-																_0: 'border-left',
-																_1: function () {
-																	var _p11 = s.milestone.dueOn;
-																	if (_p11.ctor === 'Just') {
-																		return A2(
-																			_elm_lang$core$Basics_ops['++'],
-																			_elm_lang$core$Basics$toString(
-																				(_elm_lang$core$Time$inHours(
-																					_elm_lang$core$Date$toTime(_p11._0)) / 12) - (_elm_lang$core$Time$inHours(
-																					_elm_lang$core$Date$toTime(model.now)) / 12)),
-																			'px solid rgba(255,255,255,0.1)');
-																	} else {
-																		return '0px';
-																	}
-																}()
-															},
-															_1: {ctor: '[]'}
+															_0: {ctor: '_Tuple2', _0: 'border-bottom', _1: '1px solid #333'},
+															_1: {
+																ctor: '::',
+																_0: {
+																	ctor: '_Tuple2',
+																	_0: 'border-left',
+																	_1: function () {
+																		var _p11 = s.milestone.dueOn;
+																		if (_p11.ctor === 'Just') {
+																			return A2(
+																				_elm_lang$core$Basics_ops['++'],
+																				_elm_lang$core$Basics$toString(
+																					(_elm_lang$core$Time$inHours(
+																						_elm_lang$core$Date$toTime(_p11._0)) / 12) - (_elm_lang$core$Time$inHours(
+																						_elm_lang$core$Date$toTime(model.now)) / 12)),
+																				'px solid #444');
+																		} else {
+																			return '0px';
+																		}
+																	}()
+																},
+																_1: {ctor: '[]'}
+															}
 														}
 													}
 												}
