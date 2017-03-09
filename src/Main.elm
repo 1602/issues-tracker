@@ -95,6 +95,12 @@ aboutToLoadResource loc model =
             Nothing ->
                 model
 
+loadAllIssues : String -> List (Cmd Msg)
+loadAllIssues accessToken =
+    [ fetchIssues accessToken Current
+    , fetchIssues accessToken Icebox
+    , fetchMilestones accessToken
+    ]
 
 loadResource : Location -> Maybe AppUser -> List (Cmd Msg)
 loadResource loc user =
@@ -106,16 +112,10 @@ loadResource loc user =
             Just user ->
                 case page of
                     Just IssuesIndex ->
-                        [ fetchIssues user.secretKey Current
-                        , fetchIssues user.secretKey Icebox
-                        , fetchMilestones user.secretKey
-                        ]
+                        loadAllIssues user.secretKey
 
                     Nothing ->
-                        [ fetchIssues user.secretKey Current
-                        , fetchIssues user.secretKey Icebox
-                        , fetchMilestones user.secretKey
-                        ]
+                        loadAllIssues user.secretKey
 
             Nothing ->
                 []
@@ -153,7 +153,13 @@ update msg model =
             { model | now = now } ! []
 
         CurrentTime now ->
-            { model | now = Date.fromTime now } ! []
+            { model | now = Date.fromTime now }
+                ! (case model.user of
+                    Just user ->
+                        loadAllIssues user.secretKey
+                    Nothing ->
+                        []
+                )
 
         UrlChange location ->
             ({ model | location = location }
@@ -200,9 +206,16 @@ update msg model =
                             milestones
                                 |> List.foldl
                                     (\ms ->
-                                        Dict.insert ms.number <| ExpandedMilestone ms Nothing Nothing
+                                        Dict.update ms.number (\m ->
+                                            Just <|
+                                                case m of
+                                                    Just m ->
+                                                        { m | milestone = ms }
+                                                    Nothing ->
+                                                        ExpandedMilestone ms Nothing Nothing
+                                        )
                                     )
-                                    Dict.empty
+                                    (model.milestones |> Maybe.withDefault Dict.empty)
                                 |> Just
                         , error = Nothing
                     }
@@ -436,7 +449,7 @@ save result model fn =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Time.every (30 * Time.second) CurrentTime
+        [ Time.every (60 * Time.second) CurrentTime
         ]
 
 
