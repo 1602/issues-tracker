@@ -566,12 +566,13 @@ viewPage user model route =
                             [ style
                                 [ ("list-style", "none")
                                 , ("padding", "5px")
-                                , ( "border-bottom", "1px dotted #8f8" )
+                                , ("margin", "2px")
+                                , ( "border-bottom", "1px solid #333" )
                                 , ("border-left", case s.milestone.dueOn of
                                     Just date ->
                                         (toString
                                             (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
-                                            ) ++ "px solid rgba(255,255,255,0.1)"
+                                            ) ++ "px solid #444"
                                     Nothing ->
                                         "0px"
                                 )
