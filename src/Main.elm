@@ -614,39 +614,47 @@ viewPage user model route =
                             )
                         |> List.map
                             (\s ->
-                                Html.li
-                                    [ style
-                                        [ ( "list-style", "none" )
-                                        , ( "padding", "5px" )
-                                        , ( "margin", "2px" )
-                                        , ( "border-bottom", "1px solid #333" )
-                                        , ( "border-left"
-                                          , case s.milestone.dueOn of
-                                                Just date ->
-                                                    (toString
-                                                        (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
-                                                    )
-                                                        ++ "px solid #444"
+                                let
+                                    isOverdue =
+                                        case s.milestone.dueOn of
+                                            Just date ->
+                                                (Date.toTime date) < (Date.toTime model.now)
+                                            Nothing ->
+                                                False
+                                in
+                                    Html.li
+                                        [ style
+                                            [ ( "list-style", "none" )
+                                            , ( "padding", "5px" )
+                                            , ( "margin", "2px" )
+                                            , ( "border-bottom", "1px solid #333" )
+                                            , ( "border-left"
+                                              , case s.milestone.dueOn of
+                                                    Just date ->
+                                                        (toString
+                                                            (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
+                                                        )
+                                                            ++ "px solid #444"
 
-                                                Nothing ->
-                                                    "0px"
-                                          )
+                                                    Nothing ->
+                                                        "0px"
+                                              )
+                                            ]
                                         ]
-                                    ]
-                                    [ text <| s.milestone.title ++ " "
-                                    , Html.span [ style [ ( "color", "grey" ) ] ]
-                                        [ text <|
-                                            case s.milestone.dueOn of
-                                                Just date ->
-                                                    if (Date.toTime date) > (Date.toTime model.now) then
-                                                        " (due in " ++ (Distance.inWords date model.now) ++ ")"
-                                                    else
-                                                        " (" ++ (Distance.inWords date model.now) ++ " overdue)"
+                                        [ text <| s.milestone.title ++ " "
+                                        , Html.span [ style [ ( "color", if isOverdue then "red" else "grey" ) ] ]
+                                            [ text <|
+                                                case s.milestone.dueOn of
+                                                    Just date ->
+                                                        if isOverdue then
+                                                            " (" ++ (Distance.inWords date model.now) ++ " overdue)"
+                                                        else
+                                                            " (due in " ++ (Distance.inWords date model.now) ++ ")"
 
-                                                Nothing ->
-                                                    " (no due date)"
+                                                    Nothing ->
+                                                        " (no due date)"
+                                            ]
                                         ]
-                                    ]
                             )
                         |> Html.ul [ style [ ( "zoom", "150%" ) ] ]
 
