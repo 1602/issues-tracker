@@ -77,6 +77,11 @@ init persistentData location =
                 --fetchClients user.secretKey
                 Nothing ->
                     Cmd.none
+           , case parseHash location of
+               Nothing ->
+                   Navigation.modifyUrl "#/stories"
+               Just _ ->
+                    Cmd.none
            ]
             ++ (loadResource location persistentData.user)
           )
@@ -90,10 +95,11 @@ aboutToLoadResource loc model =
     in
         case page of
             Just IssuesIndex ->
-                { model | iceboxIssues = Just [] }
+                model
 
             _ ->
                 model
+
 
 loadAllIssues : String -> List (Cmd Msg)
 loadAllIssues accessToken =
@@ -101,6 +107,7 @@ loadAllIssues accessToken =
     , fetchIssues accessToken Icebox
     , fetchMilestones accessToken
     ]
+
 
 loadResource : Location -> Maybe AppUser -> List (Cmd Msg)
 loadResource loc user =
@@ -139,6 +146,7 @@ port clipboard : String -> Cmd msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    -- TODO: separate actions which require user
     case msg of
         NoOp ->
             model ! []
@@ -148,9 +156,17 @@ update msg model =
 
         SaveAccessToken ->
             let
-                user = Just <| AppUser "" "" (Maybe.withDefault "" model.token)
+                token =
+                    (Maybe.withDefault "" model.token)
+
+                user =
+                    Just <| AppUser "" "" token
             in
-                { model | user = user } ! ((saveData <| PersistedData user) :: (loadResource model.location user))
+                if token == "" then
+                    model ! [Navigation.load "https://github.com/settings/tokens"]
+                else
+                    { model | user = user } ! ((saveData <| PersistedData user) :: (loadResource model.location user))
+
 
         CurrentDate now ->
             { model | now = now } ! []
@@ -160,9 +176,10 @@ update msg model =
                 ! (case model.user of
                     Just user ->
                         loadAllIssues user.secretKey
+
                     Nothing ->
                         []
-                )
+                  )
 
         UrlChange location ->
             ({ model | location = location }
@@ -209,14 +226,16 @@ update msg model =
                             milestones
                                 |> List.foldl
                                     (\ms ->
-                                        Dict.update ms.number (\m ->
-                                            Just <|
-                                                case m of
-                                                    Just m ->
-                                                        { m | milestone = ms }
-                                                    Nothing ->
-                                                        ExpandedMilestone ms Nothing Nothing
-                                        )
+                                        Dict.update ms.number
+                                            (\m ->
+                                                Just <|
+                                                    case m of
+                                                        Just m ->
+                                                            { m | milestone = ms }
+
+                                                        Nothing ->
+                                                            ExpandedMilestone ms Nothing Nothing
+                                            )
                                     )
                                     (model.milestones |> Maybe.withDefault Dict.empty)
                                 |> Just
@@ -253,82 +272,86 @@ update msg model =
             model ! [ clipboard str ]
 
         UnsetMilestone m result ->
-            model !
-            (case model.user of
-                Just user ->
-                    [ fetchMilestoneIssues user.secretKey IssueOpen m
-                    , fetchIssues user.secretKey Icebox
-                    ]
+            model
+                ! (case model.user of
+                    Just user ->
+                        [ fetchMilestoneIssues user.secretKey IssueOpen m
+                        , fetchIssues user.secretKey Icebox
+                        ]
 
-                Nothing ->
-                    []
-                    )
+                    Nothing ->
+                        []
+                  )
 
         SetMilestone issue milestone ->
             case model.user of
                 Just user ->
-                    { model | pickMilestoneForIssue = Nothing } !
-                        [ updateIssueWith issue.number (Encode.object
-                            [ ("milestone"
-                                , milestone.number
-                                |> String.toInt
-                                |> Result.toMaybe
-                                |> Maybe.withDefault 0
-                                |> Encode.int
+                    { model | pickMilestoneForIssue = Nothing }
+                        ! [ updateIssueWith issue.number
+                                (Encode.object
+                                    [ ( "milestone"
+                                      , milestone.number
+                                            |> String.toInt
+                                            |> Result.toMaybe
+                                            |> Maybe.withDefault 0
+                                            |> Encode.int
+                                      )
+                                    ]
                                 )
-                            ]
-                            ) user.secretKey (MilestoneSet milestone)
-                        ]
+                                user.secretKey
+                                (MilestoneSet milestone)
+                          ]
 
                 Nothing ->
                     model ! []
 
         MilestoneSet m result ->
-            model !
-            (case model.user of
-                Just user ->
-                    [ fetchMilestoneIssues user.secretKey IssueOpen m
-                    , fetchIssues user.secretKey Icebox
-                    ]
+            model
+                ! (case model.user of
+                    Just user ->
+                        [ fetchMilestoneIssues user.secretKey IssueOpen m
+                        , fetchIssues user.secretKey Icebox
+                        ]
 
-                Nothing ->
-                    []
-                    )
+                    Nothing ->
+                        []
+                  )
 
         IssueRestarted m result ->
-            model !
-            (case model.user of
-                Just user ->
-                    [ fetchMilestoneIssues user.secretKey IssueClosed m
-                    , fetchIssues user.secretKey Current
-                    ]
+            model
+                ! (case model.user of
+                    Just user ->
+                        [ fetchMilestoneIssues user.secretKey IssueClosed m
+                        , fetchIssues user.secretKey Current
+                        ]
 
-                Nothing ->
-                    []
-                    )
+                    Nothing ->
+                        []
+                  )
+
         IssueStarted m result ->
-            model !
-            (case model.user of
-                Just user ->
-                    [ fetchMilestoneIssues user.secretKey IssueOpen m
-                    , fetchIssues user.secretKey Current
-                    ]
+            model
+                ! (case model.user of
+                    Just user ->
+                        [ fetchMilestoneIssues user.secretKey IssueOpen m
+                        , fetchIssues user.secretKey Current
+                        ]
 
-                Nothing ->
-                    []
-                    )
+                    Nothing ->
+                        []
+                  )
 
         IssueFinished m result ->
-            model !
-            (case model.user of
-                Just user ->
-                    [ fetchMilestoneIssues user.secretKey IssueClosed m
-                    , fetchIssues user.secretKey Current
-                    ]
+            model
+                ! (case model.user of
+                    Just user ->
+                        [ fetchMilestoneIssues user.secretKey IssueClosed m
+                        , fetchIssues user.secretKey Current
+                        ]
 
-                Nothing ->
-                    []
-                    )
+                    Nothing ->
+                        []
+                  )
 
         DismissPlanningIssue ->
             { model | pickMilestoneForIssue = Nothing } ! []
@@ -340,9 +363,10 @@ update msg model =
                         "unplan" ->
                             case issue.milestone of
                                 Just m ->
-                                    model !
-                                        [ updateIssue issue user.secretKey (UnsetMilestone m)
-                                        ]
+                                    model
+                                        ! [ UnsetMilestone m
+                                                |> updateIssue issue user.secretKey
+                                          ]
 
                                 Nothing ->
                                     model ! []
@@ -350,57 +374,69 @@ update msg model =
                         "start" ->
                             case issue.milestone of
                                 Just m ->
-                                    model !
-                                        [ updateIssueWith issue.number (Encode.object
-                                            [ ("labels"
-                                                , issue.labels
-                                                    |> List.map .name
-                                                    |> (::) "Status: In Progress"
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
+                                    model
+                                        ! [ updateIssueWith issue.number
+                                                (Encode.object
+                                                    [ ( "labels"
+                                                      , issue.labels
+                                                            |> List.map .name
+                                                            |> (::) "Status: In Progress"
+                                                            |> List.map Encode.string
+                                                            |> Encode.list
+                                                      )
+                                                    ]
                                                 )
-                                            ]
-                                            ) user.secretKey (IssueStarted m)
-                                            ]
+                                                user.secretKey
+                                                (IssueStarted m)
+                                          ]
+
                                 Nothing ->
                                     model ! []
 
                         "finish" ->
                             case issue.milestone of
                                 Just m ->
-                                    model !
-                                        [ updateIssueWith issue.number (Encode.object
-                                            [ ("labels"
-                                                , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: In Progress")
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
+                                    model
+                                        ! [ updateIssueWith issue.number
+                                                (Encode.object
+                                                    [ ( "labels"
+                                                      , issue.labels
+                                                            |> List.map .name
+                                                            |> List.filter (\s -> s /= "Status: In Progress")
+                                                            |> List.map Encode.string
+                                                            |> Encode.list
+                                                      )
+                                                    , ( "state", Encode.string "closed" )
+                                                    ]
                                                 )
-                                            , ( "state", Encode.string "closed" )
-                                            ]
-                                            ) user.secretKey (IssueFinished m)
-                                            ]
+                                                user.secretKey
+                                                (IssueFinished m)
+                                          ]
+
                                 Nothing ->
                                     model ! []
 
                         "reopen" ->
                             case issue.milestone of
                                 Just m ->
-                                    model !
-                                        [ updateIssueWith issue.number (Encode.object
-                                            [ ("labels"
-                                                , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: In Progress")
-                                                    |> (::) "Status: In Progress"
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
+                                    model
+                                        ! [ updateIssueWith issue.number
+                                                (Encode.object
+                                                    [ ( "labels"
+                                                      , issue.labels
+                                                            |> List.map .name
+                                                            |> List.filter (\s -> s /= "Status: In Progress")
+                                                            |> (::) "Status: In Progress"
+                                                            |> List.map Encode.string
+                                                            |> Encode.list
+                                                      )
+                                                    , ( "state", Encode.string "open" )
+                                                    ]
                                                 )
-                                            , ( "state", Encode.string "open" )
-                                            ]
-                                            ) user.secretKey (IssueRestarted m)
-                                            ]
+                                                user.secretKey
+                                                (IssueRestarted m)
+                                          ]
+
                                 Nothing ->
                                     model ! []
 
@@ -410,18 +446,22 @@ update msg model =
                         "unstart" ->
                             case issue.milestone of
                                 Just m ->
-                                    model !
-                                        [ updateIssueWith issue.number (Encode.object
-                                            [ ("labels"
-                                                , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: In Progress")
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
+                                    model
+                                        ! [ updateIssueWith issue.number
+                                                (Encode.object
+                                                    [ ( "labels"
+                                                      , issue.labels
+                                                            |> List.map .name
+                                                            |> List.filter (\s -> s /= "Status: In Progress")
+                                                            |> List.map Encode.string
+                                                            |> Encode.list
+                                                      )
+                                                    ]
                                                 )
-                                            ]
-                                            ) user.secretKey (IssueStarted m)
-                                            ]
+                                                user.secretKey
+                                                (IssueStarted m)
+                                          ]
+
                                 Nothing ->
                                     model ! []
 
@@ -430,6 +470,7 @@ update msg model =
 
                         _ ->
                             model ! []
+
                 Nothing ->
                     model ! []
 
@@ -489,33 +530,35 @@ view model =
         case model.user of
             Just user ->
                 div []
-                    -- [ viewTopbar user model.location
-                    [ viewPage user model <| parseHash model.location
+                    [ viewTopbar user model.location
+                    , viewPage user model <| parseHash model.location
                     , error
                     , case model.pickMilestoneForIssue of
                         Just issue ->
-                            div [ style
-                                [ ( "position", "fixed" )
-                                , ( "top", "70px" )
-                                , ( "left", "50%" )
-                                , ( "margin-left", "-200px" )
-                                , ( "width", "400px" )
-                                , ( "padding", "10px" )
-                                , ( "background", "#777" )
-                                , ( "border", "2px solid #bbb" )
-                                ]
+                            div
+                                [ style
+                                    [ ( "position", "fixed" )
+                                    , ( "top", "70px" )
+                                    , ( "left", "50%" )
+                                    , ( "margin-left", "-200px" )
+                                    , ( "width", "400px" )
+                                    , ( "padding", "10px" )
+                                    , ( "background", "#777" )
+                                    , ( "border", "2px solid #bbb" )
+                                    ]
                                 ]
                                 [ div [] [ text "Select milestone for issue " ]
                                 , Html.strong [] [ text <| "#" ++ issue.number ]
                                 , text <| " " ++ issue.title
                                 , Html.hr [] []
                                 , model.milestones
-                                        |> Maybe.withDefault Dict.empty
-                                        |> Dict.values
-                                        |> List.map (\s ->
-                                            Html.li [ style [ ("list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
-                                            )
-                                        |> Html.ul []
+                                    |> Maybe.withDefault Dict.empty
+                                    |> Dict.values
+                                    |> List.map
+                                        (\s ->
+                                            Html.li [ style [ ( "list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
+                                        )
+                                    |> Html.ul []
                                 , Html.hr [] []
                                 , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
                                 ]
@@ -526,7 +569,11 @@ view model =
 
             Nothing ->
                 div []
-                    [ text "cheers. visit https://github.com/settings/tokens and fill this input "
+                    [ text "cheers. visit "
+                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
+                    , text " (we need 'repo' access granted to see all private repositories)"
+                    , Html.br [] [] 
+                    , text "and fill this input "
                     , Html.input [ onInput EditAccessToken ] []
                     , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
                     ]
@@ -556,43 +603,52 @@ viewPage user model route =
                 Just milestones ->
                     milestones
                         |> Dict.values
-                        |> List.sortBy (\s -> case s.milestone.dueOn of
-                            Just date ->
-                                Date.toTime date |> Time.inHours
-                            Nothing ->
-                                1/0
-                        )
-                        |> List.map (\s -> Html.li
-                            [ style
-                                [ ("list-style", "none")
-                                , ("padding", "5px")
-                                , ("margin", "2px")
-                                , ( "border-bottom", "1px solid #333" )
-                                , ("border-left", case s.milestone.dueOn of
+                        |> List.sortBy
+                            (\s ->
+                                case s.milestone.dueOn of
                                     Just date ->
-                                        (toString
-                                            (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
-                                            ) ++ "px solid #444"
+                                        Date.toTime date |> Time.inHours
+
                                     Nothing ->
-                                        "0px"
-                                )
-                                ]
-                            ]
-                            [ text <| s.milestone.title ++ " "
-                            , Html.span [ style [("color", "grey")] ]
-                                [ text <|
-                                    case s.milestone.dueOn of
-                                        Just date ->
-                                            if (Date.toTime date) > (Date.toTime model.now) then
-                                                " (due in " ++ (Distance.inWords date model.now) ++ ")"
-                                            else
-                                                " (" ++ (Distance.inWords date model.now) ++ " overdue)"
-                                        Nothing ->
-                                            " (no due date)"
-                                ]
-                            ]
+                                        1 / 0
                             )
-                        |> Html.ul [ style [ ("zoom", "150%")] ]
+                        |> List.map
+                            (\s ->
+                                Html.li
+                                    [ style
+                                        [ ( "list-style", "none" )
+                                        , ( "padding", "5px" )
+                                        , ( "margin", "2px" )
+                                        , ( "border-bottom", "1px solid #333" )
+                                        , ( "border-left"
+                                          , case s.milestone.dueOn of
+                                                Just date ->
+                                                    (toString
+                                                        (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
+                                                    )
+                                                        ++ "px solid #444"
+
+                                                Nothing ->
+                                                    "0px"
+                                          )
+                                        ]
+                                    ]
+                                    [ text <| s.milestone.title ++ " "
+                                    , Html.span [ style [ ( "color", "grey" ) ] ]
+                                        [ text <|
+                                            case s.milestone.dueOn of
+                                                Just date ->
+                                                    if (Date.toTime date) > (Date.toTime model.now) then
+                                                        " (due in " ++ (Distance.inWords date model.now) ++ ")"
+                                                    else
+                                                        " (" ++ (Distance.inWords date model.now) ++ " overdue)"
+
+                                                Nothing ->
+                                                    " (no due date)"
+                                        ]
+                                    ]
+                            )
+                        |> Html.ul [ style [ ( "zoom", "150%" ) ] ]
 
                 Nothing ->
                     text "Loading..."
@@ -639,25 +695,28 @@ listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState ->
 listIssuesWithinMilestones milestones issueState now =
     milestones
         |> Dict.values
-        |> List.sortBy (\ems -> case ems.milestone.dueOn of
-            Nothing ->
-                1 / 0
+        |> List.sortBy
+            (\ems ->
+                case ems.milestone.dueOn of
+                    Nothing ->
+                        1 / 0
 
-            Just date ->
-                date
-                    |> Date.toTime
-                    |> Time.inSeconds
-                )
+                    Just date ->
+                        date
+                            |> Date.toTime
+                            |> Time.inSeconds
+            )
         |> List.map
             (\expandedMilestone ->
                 let
                     filterOutInProgress issues =
                         issues
-                            |> List.filter (\issue ->
-                                issue.labels
-                                    |> List.any (\label -> label.name == "Status: In Progress")
-                                    |> not
-                                    )
+                            |> List.filter
+                                (\issue ->
+                                    issue.labels
+                                        |> List.any (\label -> label.name == "Status: In Progress")
+                                        |> not
+                                )
 
                     displayIssuesOrLoading issues =
                         case issues of
@@ -684,7 +743,7 @@ listIssuesWithinMilestones milestones issueState now =
                 in
                     div []
                         [ span [ cellStyle "400px" ]
-                            [ Html.strong [ style [ ( "color", "yellowgreen" ), ("line-height", "22px"), ("font-size", "14px") ] ]
+                            [ Html.strong [ style [ ( "color", "yellowgreen" ), ( "line-height", "22px" ), ( "font-size", "14px" ) ] ]
                                 [ text <| "🏁 " ++ expandedMilestone.milestone.title ]
                             , case expandedMilestone.milestone.dueOn of
                                 Just date ->
@@ -709,11 +768,12 @@ listIssues issues col =
             case col of
                 Icebox ->
                     issues
-                        |> List.filter (\issue ->
-                            issue.labels
-                                |> List.any (\label -> label.name == "Status: In Progress")
-                                |> not
-                                )
+                        |> List.filter
+                            (\issue ->
+                                issue.labels
+                                    |> List.any (\label -> label.name == "Status: In Progress")
+                                    |> not
+                            )
 
                 _ ->
                     issues
@@ -729,7 +789,7 @@ listIssues issues col =
                     , ( "border-radius", "1px" )
                     , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
                     ]
-                ,   onClick (IssueAction issue title)
+                , onClick (IssueAction issue title)
                 ]
                 [ text title ]
 
@@ -773,12 +833,17 @@ listIssues issues col =
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , span [ style [ ( "color", getPriorityColor issue ) ] ] [ text <| " " ++ issue.title ++ " " ]
                             , Html.i [ style [ ( "color", "darkgrey" ) ] ]
-                                    (if List.length issue.assignees == 0 then
-                                        [ text "(unassigned)" ]
-                                    else
-                                        issue.assignees
-                                            |> List.map (\s -> Html.img
-                                            [ src s.avatar, Attrs.width 20, style [("vertical-align", "middle")] ] []))
+                                (if List.length issue.assignees == 0 then
+                                    [ text "(unassigned)" ]
+                                 else
+                                    issue.assignees
+                                        |> List.map
+                                            (\s ->
+                                                Html.img
+                                                    [ src s.avatar, Attrs.width 20, style [ ( "vertical-align", "middle" ) ] ]
+                                                    []
+                                            )
+                                )
                             , div [ Attrs.class "buttons" ] <|
                                 case col of
                                     Backlog ->
@@ -791,7 +856,9 @@ listIssues issues col =
                                         case issue.milestone of
                                             Just ms ->
                                                 [ button issue "unstart"
-                                                , button issue "finish" ]
+                                                , button issue "finish"
+                                                ]
+
                                             Nothing ->
                                                 [ button issue "gh" ]
 
@@ -868,7 +935,8 @@ viewTopbar user location =
             [ span [] [ text user.login ]
             , img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
             ]
-        , [ viewLink "issues" (text "Issues")
+        , [ viewLink "stories" (text "Stories")
+          , viewLink "milestones" (text "Milestones")
           ]
             |> List.map (\s -> s location)
             |> Html.ul
@@ -888,7 +956,7 @@ viewLink src childNode location =
 
         color =
             if isActive then
-                "#ff9b89"
+                "rgb(246,246,247)"
             else
                 "rgba(255,255,255, 0.1)"
 
@@ -908,7 +976,8 @@ viewLink src childNode location =
                 [ ( "list-style", "none" )
                 , ( "display", "inline-block" )
                 , ( "padding", "5px" )
-                , ( "margin", "5px" )
+                , ( "margin", "0" )
+                , ( "margin-bottom", "10px" )
                 , ( "font-weight", "700" )
                 , ( "background", color )
                 , ( "color", "black" )

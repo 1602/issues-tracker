@@ -12,7 +12,7 @@ type Route
 route : Parser (Route -> a) a
 route =
     oneOf
-        [ map IssuesIndex (s "issues")
+        [ map IssuesIndex (s "stories")
         , map MilestonesIndex (s "milestones")
         ]
 
