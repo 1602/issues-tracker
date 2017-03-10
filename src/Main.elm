@@ -53,6 +53,7 @@ type alias Model =
     , closedIssues : Maybe (List Issue)
     , milestones : Maybe (Dict.Dict String ExpandedMilestone)
     , pickMilestoneForIssue : Maybe Issue
+    , lockedIssueNumber : String
     }
 
 
@@ -69,6 +70,7 @@ init persistentData location =
         Nothing
         Nothing
         Nothing
+        ""
         ! ([ Task.perform CurrentDate Date.now
            , case persistentData.user of
                 Just user ->
@@ -272,7 +274,7 @@ update msg model =
             model ! [ clipboard str ]
 
         UnsetMilestone m result ->
-            model
+            { model | lockedIssueNumber = "" }
                 ! (case model.user of
                     Just user ->
                         [ fetchMilestoneIssues user.secretKey IssueOpen m
@@ -286,7 +288,7 @@ update msg model =
         SetMilestone issue milestone ->
             case model.user of
                 Just user ->
-                    { model | pickMilestoneForIssue = Nothing }
+                    { model | pickMilestoneForIssue = Nothing, lockedIssueNumber = issue.number }
                         ! [ updateIssueWith issue.number
                                 (Encode.object
                                     [ ( "milestone"
@@ -306,7 +308,7 @@ update msg model =
                     model ! []
 
         MilestoneSet m result ->
-            model
+            { model | lockedIssueNumber = "" }
                 ! (case model.user of
                     Just user ->
                         [ fetchMilestoneIssues user.secretKey IssueOpen m
@@ -318,7 +320,7 @@ update msg model =
                   )
 
         IssueRestarted m result ->
-            model
+            { model | lockedIssueNumber = "" }
                 ! (case model.user of
                     Just user ->
                         [ fetchMilestoneIssues user.secretKey IssueClosed m
@@ -330,7 +332,7 @@ update msg model =
                   )
 
         IssueStarted m result ->
-            model
+            { model | lockedIssueNumber = "" }
                 ! (case model.user of
                     Just user ->
                         [ fetchMilestoneIssues user.secretKey IssueOpen m
@@ -342,7 +344,7 @@ update msg model =
                   )
 
         IssueFinished m result ->
-            model
+            { model | lockedIssueNumber = "" }
                 ! (case model.user of
                     Just user ->
                         [ fetchMilestoneIssues user.secretKey IssueClosed m
@@ -363,7 +365,7 @@ update msg model =
                         "unplan" ->
                             case issue.milestone of
                                 Just m ->
-                                    model
+                                    { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
                                                 |> updateIssue issue user.secretKey
                                           ]
@@ -374,7 +376,7 @@ update msg model =
                         "start" ->
                             case issue.milestone of
                                 Just m ->
-                                    model
+                                    { model | lockedIssueNumber = issue.number }
                                         ! [ updateIssueWith issue.number
                                                 (Encode.object
                                                     [ ( "labels"
@@ -396,7 +398,7 @@ update msg model =
                         "finish" ->
                             case issue.milestone of
                                 Just m ->
-                                    model
+                                    { model | lockedIssueNumber = issue.number }
                                         ! [ updateIssueWith issue.number
                                                 (Encode.object
                                                     [ ( "labels"
@@ -419,7 +421,7 @@ update msg model =
                         "reopen" ->
                             case issue.milestone of
                                 Just m ->
-                                    model
+                                    { model | lockedIssueNumber = issue.number }
                                         ! [ updateIssueWith issue.number
                                                 (Encode.object
                                                     [ ( "labels"
@@ -446,7 +448,7 @@ update msg model =
                         "unstart" ->
                             case issue.milestone of
                                 Just m ->
-                                    model
+                                    { model | lockedIssueNumber = issue.number }
                                         ! [ updateIssueWith issue.number
                                                 (Encode.object
                                                     [ ( "labels"
@@ -585,7 +587,7 @@ viewPage user model route =
         displayIssuesWithinMilestones milestones issueState =
             case milestones of
                 Just milestones ->
-                    listIssuesWithinMilestones milestones issueState model.now
+                    listIssuesWithinMilestones milestones issueState model.now model.lockedIssueNumber
 
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
@@ -593,7 +595,7 @@ viewPage user model route =
         displayIssues issues col =
             case issues of
                 Just issues ->
-                    listIssues issues col
+                    listIssues issues col model.lockedIssueNumber
 
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
@@ -699,8 +701,8 @@ viewPage user model route =
                         milestonesIndex
 
 
-listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Html Msg
-listIssuesWithinMilestones milestones issueState now =
+listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> String -> Html Msg
+listIssuesWithinMilestones milestones issueState now lockedIssueNumber =
     milestones
         |> Dict.values
         |> List.sortBy
@@ -736,7 +738,7 @@ listIssuesWithinMilestones milestones issueState now =
 
                                         IssueClosed ->
                                             Done
-                                    )
+                                    ) lockedIssueNumber
 
                             Nothing ->
                                 span [ cellStyle "400px" ] [ text "Loading" ]
@@ -769,8 +771,8 @@ listIssuesWithinMilestones milestones issueState now =
         |> div []
 
 
-listIssues : List Issue -> Column -> Html Msg
-listIssues issues col =
+listIssues : List Issue -> Column -> String -> Html Msg
+listIssues issues col lockedIssueNumber =
     let
         filterOutInProgress issues =
             case col of
@@ -835,7 +837,9 @@ listIssues issues col =
             |> filterOutInProgress
             |> List.map
                 (\issue ->
-                    div [ Attrs.class "story" ]
+                    div [ Attrs.class "story", style [ if issue.number == lockedIssueNumber then
+                        ("filter", "grayscale(0.5) blur(2px)") else ("filter", "none")
+                        ] ]
                         [ span [ cellStyle "400px" ]
                             [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
