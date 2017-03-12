@@ -26,4 +26,5 @@ type Msg
     | EditAccessToken String
     | SaveAccessToken
     | DismissPlanningIssue
+    | SelectStory Issue
 
