@@ -28,23 +28,45 @@ h3 > small {
     vertical-align: middle;
 }
 
-.story:hover .buttons {
+.selected.story {
+    background: white;
+    word-wrap: initial;
+    white-space: normal;
+}
+
+.selected.story p {
+    color: black;
+    text-overflow: initial;
+    line-height: 1.5em;
+}
+
+.selected.story a {
+    color: blue;
+}
+
+.not-selected.story:hover .buttons {
     display: block;
 }
 
-.story .buttons {
+.not-selected.story:focus {
+    outline: none;
+}
+
+.not-selected.story .buttons {
     display: none;
     position: absolute;
     top: 0;
     right: 0;
 }
+
 .story {
+    white-space: nowrap;
     position: relative;
 }
 
 h1 { font-size : 23px; font-weight: 700; color: #ff9b89; }
 h2 { font-size : 19px; font-weight: 500; color: #ff9b89; }
-h3 {
+section > h3 {
     background: #111;
     padding: 5px;
     margin: 2px;
@@ -84,5 +106,5 @@ pre, code {
   </head>
   <body>
     <div id="main"></div>
-  <script type="text/javascript" src="563952681cee598b4ea0.js"></script></body>
+  <script type="text/javascript" src="28f017e8b62267de9f10.js"></script></body>
 </html>
