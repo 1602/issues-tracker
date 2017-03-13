@@ -13532,7 +13532,11 @@
 																	_0: 'color',
 																	_1: getPriorityColor(issue)
 																},
-																_1: {ctor: '[]'}
+																_1: {
+																	ctor: '::',
+																	_0: {ctor: '_Tuple2', _0: 'cursor', _1: 'pointer'},
+																	_1: {ctor: '[]'}
+																}
 															}),
 														_1: {
 															ctor: '::',
