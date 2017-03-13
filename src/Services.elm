@@ -257,7 +257,8 @@ fetchUser accessToken =
                 hasRepoOauthScope =
                     Dict.get "X-OAuth-Scopes" res.headers
                         |> Maybe.withDefault ""
-                        |> String.contains "repo"
+                        |> String.split ", "
+                        |> List.member "repo"
             in
                 if hasRepoOauthScope then
                     Decode.decodeString userDecoder res.body

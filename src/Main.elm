@@ -196,7 +196,7 @@ update msg model =
                 if model.token == "" then
                     model ! [Navigation.load "https://github.com/settings/tokens"]
                 else
-                    updatedModel ! ((saveData <| PersistedData (Just model.token)) :: (loadResource updatedModel))
+                    updatedModel ! (fetchUser model.token :: ((saveData <| PersistedData (Just model.token)) :: (loadResource updatedModel)))
 
 
         CurrentDate now ->
