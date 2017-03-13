@@ -241,3 +241,19 @@ fetchMilestones accessToken =
         , withCredentials = False
         }
             |> Http.send LoadMilestones
+
+
+fetchUser : String -> Cmd Msg
+fetchUser accessToken =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "If-Modified-Since" "0"]
+        , url =
+            "https://api.github.com/user?access_token="
+                ++ accessToken
+        , expect = Http.expectJson userDecoder
+        , body = Http.emptyBody
+        , timeout = Nothing
+        , withCredentials = False
+        }
+            |> Http.send LoadUser

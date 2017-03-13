@@ -43,8 +43,9 @@ main =
 
 
 type alias Model =
-    { user : Maybe AppUser
-    , token : Maybe String
+    { user : Maybe User
+    , token : String
+    , accessToken : Maybe String
     , location : Location
     , now : Date.Date
     , error : Maybe String
@@ -62,8 +63,9 @@ init persistentData location =
     let
         model =
             Model
-                persistentData.user
                 Nothing
+                ""
+                persistentData.accessToken
                 location
                 (Date.fromTime <| Time.millisecond * (toFloat 0))
                 Nothing
@@ -75,9 +77,9 @@ init persistentData location =
                 ""
     in
         model ! ([ Task.perform CurrentDate Date.now
-           , case persistentData.user of
-                Just user ->
-                    Cmd.none
+           , case persistentData.accessToken of
+                Just accessToken ->
+                    fetchUser accessToken
 
                 --fetchClients user.secretKey
                 Nothing ->
@@ -118,20 +120,20 @@ loadResource : Model -> List (Cmd Msg)
 loadResource model =
     case model.currentIssues of
         Nothing ->
-            case model.user of
-                Just user ->
+            case model.accessToken of
+                Just token ->
                     case parseHash model.location of
                         Just (Story id) ->
-                            loadAllIssues user.secretKey
+                            loadAllIssues token
 
                         Just IssuesIndex ->
-                            loadAllIssues user.secretKey
+                            loadAllIssues token
 
                         Just MilestonesIndex ->
-                            loadAllIssues user.secretKey
+                            loadAllIssues token
 
                         Nothing ->
-                            loadAllIssues user.secretKey
+                            loadAllIssues token
 
                 Nothing ->
                     []
@@ -170,22 +172,23 @@ update msg model =
             model ! []
 
         EditAccessToken s ->
-            { model | token = Just s } ! []
+            { model | token = s } ! []
+
+        LoadUser result ->
+            case result of
+                Ok user ->
+                    { model | user = Just user, error = Nothing } ! []
+                Err e ->
+                    { model | error = Just (toString e), accessToken = Nothing, user = Nothing } ! []
 
         SaveAccessToken ->
             let
-                token =
-                    (Maybe.withDefault "" model.token)
-
-                user =
-                    Just <| AppUser "" "" token
-
-                updatedModel = { model | user = user }
+                updatedModel = { model | accessToken = Just model.token }
             in
-                if token == "" then
+                if model.token == "" then
                     model ! [Navigation.load "https://github.com/settings/tokens"]
                 else
-                    updatedModel ! ((saveData <| PersistedData user) :: (loadResource updatedModel))
+                    updatedModel ! ((saveData <| PersistedData (Just model.token)) :: (loadResource updatedModel))
 
 
         CurrentDate now ->
@@ -193,9 +196,9 @@ update msg model =
 
         CurrentTime now ->
             { model | now = Date.fromTime now }
-                ! (case model.user of
-                    Just user ->
-                        loadAllIssues user.secretKey
+                ! (case model.accessToken of
+                    Just token ->
+                        loadAllIssues token
 
                     Nothing ->
                         []
@@ -276,10 +279,10 @@ update msg model =
                                 |> Just
                         , error = Nothing
                     }
-                        ! (case model.user of
-                            Just user ->
-                                (milestones |> List.map (fetchMilestoneIssues user.secretKey IssueOpen))
-                                    ++ (milestones |> List.map (fetchMilestoneIssues user.secretKey IssueClosed))
+                        ! (case model.accessToken of
+                            Just token ->
+                                (milestones |> List.map (fetchMilestoneIssues token IssueOpen))
+                                    ++ (milestones |> List.map (fetchMilestoneIssues token IssueClosed))
 
                             Nothing ->
                                 []
@@ -307,10 +310,10 @@ update msg model =
 
         UnsetMilestone m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueOpen m
-                        , fetchIssues user.secretKey Icebox
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueOpen m
+                        , fetchIssues token Icebox
                         ]
 
                     Nothing ->
@@ -318,8 +321,8 @@ update msg model =
                   )
 
         SetMilestone issue milestone ->
-            case model.user of
-                Just user ->
+            case model.accessToken of
+                Just token ->
                     { model | pickMilestoneForIssue = Nothing, lockedIssueNumber = issue.number }
                         ! [ updateIssueWith issue.number
                                 (Encode.object
@@ -332,7 +335,7 @@ update msg model =
                                       )
                                     ]
                                 )
-                                user.secretKey
+                                token
                                 (MilestoneSet milestone)
                           ]
 
@@ -341,10 +344,10 @@ update msg model =
 
         MilestoneSet m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueOpen m
-                        , fetchIssues user.secretKey Icebox
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueOpen m
+                        , fetchIssues token Icebox
                         ]
 
                     Nothing ->
@@ -353,10 +356,10 @@ update msg model =
 
         IssueRestarted m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueClosed m
-                        , fetchIssues user.secretKey Current
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueClosed m
+                        , fetchIssues token Current
                         ]
 
                     Nothing ->
@@ -365,10 +368,10 @@ update msg model =
 
         IssueStarted m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueOpen m
-                        , fetchIssues user.secretKey Current
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueOpen m
+                        , fetchIssues token Current
                         ]
 
                     Nothing ->
@@ -377,10 +380,10 @@ update msg model =
 
         IssueFinished m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueClosed m
-                        , fetchIssues user.secretKey Current
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueClosed m
+                        , fetchIssues token Current
                         ]
 
                     Nothing ->
@@ -391,15 +394,15 @@ update msg model =
             { model | pickMilestoneForIssue = Nothing } ! []
 
         IssueAction issue action ->
-            case model.user of
-                Just user ->
+            case model.accessToken of
+                Just token ->
                     case action of
                         "unplan" ->
                             case issue.milestone of
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
-                                                |> updateIssue issue user.secretKey
+                                                |> updateIssue issue token
                                           ]
 
                                 Nothing ->
@@ -420,7 +423,7 @@ update msg model =
                                                       )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueStarted m)
                                           ]
 
@@ -443,7 +446,7 @@ update msg model =
                                                     , ( "state", Encode.string "closed" )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueFinished m)
                                           ]
 
@@ -467,7 +470,7 @@ update msg model =
                                                     , ( "state", Encode.string "open" )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueRestarted m)
                                           ]
 
@@ -492,7 +495,7 @@ update msg model =
                                                       )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueStarted m)
                                           ]
 
@@ -613,7 +616,7 @@ view model =
                     ]
 
 
-viewPage : AppUser -> Model -> Maybe Route -> Html Msg
+viewPage : User -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
     let
         displayIssuesWithinMilestones milestones issueState highlightStory =
@@ -1007,7 +1010,7 @@ textareaStyle =
         ]
 
 
-viewTopbar : AppUser -> Location -> Html msg
+viewTopbar : User -> Location -> Html msg
 viewTopbar user location =
     div []
         [ div

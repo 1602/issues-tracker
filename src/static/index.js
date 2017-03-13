@@ -5,6 +5,10 @@ let appData;
 
 try {
     appData = JSON.parse(localStorage.appData);
+    if (appData.user) {
+        appData.accessToken = appData.user.secretKey;
+        delete appData.user;
+    }
 } catch(e) {
     appData = { user: null };
 }
