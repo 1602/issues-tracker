@@ -8,6 +8,7 @@ import Messages exposing (..)
 import Decoders exposing (..)
 import Models exposing (..)
 import Json.Encode as Encode
+import Dict
 
 
 -- import Json.Encode as Encode
@@ -251,7 +252,13 @@ fetchUser accessToken =
         , url =
             "https://api.github.com/user?access_token="
                 ++ accessToken
-        , expect = Http.expectJson userDecoder
+        , expect = Http.expectStringResponse (\res ->
+            if Dict.get "X-OAuth-Scopes" res.headers |> Maybe.withDefault "" |> String.contains "repo" then
+                res.body
+                    |> Decode.decodeString userDecoder
+            else
+                Err "Insufficient permissions"
+            )
         , body = Http.emptyBody
         , timeout = Nothing
         , withCredentials = False

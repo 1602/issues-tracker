@@ -120,21 +120,25 @@ loadResource : Model -> List (Cmd Msg)
 loadResource model =
     case model.currentIssues of
         Nothing ->
-            case model.accessToken of
-                Just token ->
-                    case parseHash model.location of
-                        Just (Story id) ->
-                            loadAllIssues token
+            case model.user of
+                Just user ->
+                    case model.accessToken of
+                        Just token ->
+                            case parseHash model.location of
+                                Just (Story id) ->
+                                    loadAllIssues token
 
-                        Just IssuesIndex ->
-                            loadAllIssues token
+                                Just IssuesIndex ->
+                                    loadAllIssues token
 
-                        Just MilestonesIndex ->
-                            loadAllIssues token
+                                Just MilestonesIndex ->
+                                    loadAllIssues token
+
+                                Nothing ->
+                                    loadAllIssues token
 
                         Nothing ->
-                            loadAllIssues token
-
+                            []
                 Nothing ->
                     []
 
@@ -177,7 +181,11 @@ update msg model =
         LoadUser result ->
             case result of
                 Ok user ->
-                    { model | user = Just user, error = Nothing } ! []
+                    let
+                        updatedModel =
+                            { model | user = Just user, error = Nothing }
+                    in
+                        updatedModel ! (loadResource updatedModel)
                 Err e ->
                     { model | error = Just (toString e), accessToken = Nothing, user = Nothing } ! []
 
@@ -607,15 +615,20 @@ view model =
             Nothing ->
                 case model.accessToken of
                     Nothing ->
-                        div []
-                            [ text "cheers. visit "
-                            , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
-                            , text " (we need 'repo' access granted to see all private repositories)"
-                            , Html.br [] []
-                            , text "and fill this input "
-                            , Html.input [ onInput EditAccessToken ] []
-                            , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
-                            ]
+                        case model.error of
+                            Just err ->
+                                div [] [ text err ]
+
+                            Nothing ->
+                                div []
+                                    [ text "cheers. visit "
+                                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
+                                    , text " (we need 'repo' access granted to see all private repositories)"
+                                    , Html.br [] []
+                                    , text "and fill this input "
+                                    , Html.input [ onInput EditAccessToken ] []
+                                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
+                                    ]
 
                     Just _ ->
                         div [] [ text "Bear with me. I'm currently loading user information..." ]
