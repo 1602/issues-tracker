@@ -618,7 +618,7 @@ view model =
                             ]
 
                     Just _ ->
-                        div [] [ text "Bear the me. I'm currently loading user information..." ]
+                        div [] [ text "Bear with me. I'm currently loading user information..." ]
 
 
 viewPage : User -> Model -> Maybe Route -> Html Msg
