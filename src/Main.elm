@@ -43,8 +43,9 @@ main =
 
 
 type alias Model =
-    { user : Maybe AppUser
-    , token : Maybe String
+    { user : Maybe User
+    , token : String
+    , accessToken : Maybe String
     , location : Location
     , now : Date.Date
     , error : Maybe String
@@ -62,8 +63,9 @@ init persistentData location =
     let
         model =
             Model
-                persistentData.user
                 Nothing
+                ""
+                persistentData.accessToken
                 location
                 (Date.fromTime <| Time.millisecond * (toFloat 0))
                 Nothing
@@ -75,9 +77,9 @@ init persistentData location =
                 ""
     in
         model ! ([ Task.perform CurrentDate Date.now
-           , case persistentData.user of
-                Just user ->
-                    Cmd.none
+           , case persistentData.accessToken of
+                Just accessToken ->
+                    fetchUser accessToken
 
                 --fetchClients user.secretKey
                 Nothing ->
@@ -116,32 +118,31 @@ loadAllIssues accessToken =
 
 loadResource : Model -> List (Cmd Msg)
 loadResource model =
-    let
-        page =
-            parseHash model.location
+    case model.currentIssues of
+        Nothing ->
+            case model.user of
+                Just user ->
+                    case model.accessToken of
+                        Just token ->
+                            case parseHash model.location of
+                                Just (Story id) ->
+                                    loadAllIssues token
 
-    in
-        case model.currentIssues of
-            Nothing ->
-                case model.user of
-                    Just user ->
-                        case page of
-                            Just (Story id) ->
-                                loadAllIssues user.secretKey
+                                Just IssuesIndex ->
+                                    loadAllIssues token
 
-                            Just IssuesIndex ->
-                                loadAllIssues user.secretKey
+                                Just MilestonesIndex ->
+                                    loadAllIssues token
 
-                            Just MilestonesIndex ->
-                                loadAllIssues user.secretKey
+                                Nothing ->
+                                    loadAllIssues token
 
-                            Nothing ->
-                                loadAllIssues user.secretKey
+                        Nothing ->
+                            []
+                Nothing ->
+                    []
 
-                    Nothing ->
-                        []
-
-            _ -> []
+        _ -> []
 
 
 port googleAuth : (String -> msg) -> Sub msg
@@ -175,20 +176,27 @@ update msg model =
             model ! []
 
         EditAccessToken s ->
-            { model | token = Just s } ! []
+            { model | token = s } ! []
+
+        LoadUser result ->
+            case result of
+                Ok user ->
+                    let
+                        updatedModel =
+                            { model | user = Just user, error = Nothing }
+                    in
+                        updatedModel ! (loadResource updatedModel)
+                Err e ->
+                    { model | error = Just (toString e), accessToken = Nothing, user = Nothing } ! []
 
         SaveAccessToken ->
             let
-                token =
-                    (Maybe.withDefault "" model.token)
-
-                user =
-                    Just <| AppUser "" "" token
+                updatedModel = { model | accessToken = Just model.token }
             in
-                if token == "" then
+                if model.token == "" then
                     model ! [Navigation.load "https://github.com/settings/tokens"]
                 else
-                    { model | user = user } ! ((saveData <| PersistedData user) :: (loadResource model))
+                    updatedModel ! (fetchUser model.token :: ((saveData <| PersistedData (Just model.token)) :: (loadResource updatedModel)))
 
 
         CurrentDate now ->
@@ -196,9 +204,9 @@ update msg model =
 
         CurrentTime now ->
             { model | now = Date.fromTime now }
-                ! (case model.user of
-                    Just user ->
-                        loadAllIssues user.secretKey
+                ! (case model.accessToken of
+                    Just token ->
+                        loadAllIssues token
 
                     Nothing ->
                         []
@@ -279,10 +287,10 @@ update msg model =
                                 |> Just
                         , error = Nothing
                     }
-                        ! (case model.user of
-                            Just user ->
-                                (milestones |> List.map (fetchMilestoneIssues user.secretKey IssueOpen))
-                                    ++ (milestones |> List.map (fetchMilestoneIssues user.secretKey IssueClosed))
+                        ! (case model.accessToken of
+                            Just token ->
+                                (milestones |> List.map (fetchMilestoneIssues token IssueOpen))
+                                    ++ (milestones |> List.map (fetchMilestoneIssues token IssueClosed))
 
                             Nothing ->
                                 []
@@ -310,10 +318,10 @@ update msg model =
 
         UnsetMilestone m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueOpen m
-                        , fetchIssues user.secretKey Icebox
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueOpen m
+                        , fetchIssues token Icebox
                         ]
 
                     Nothing ->
@@ -321,8 +329,8 @@ update msg model =
                   )
 
         SetMilestone issue milestone ->
-            case model.user of
-                Just user ->
+            case model.accessToken of
+                Just token ->
                     { model | pickMilestoneForIssue = Nothing, lockedIssueNumber = issue.number }
                         ! [ updateIssueWith issue.number
                                 (Encode.object
@@ -335,7 +343,7 @@ update msg model =
                                       )
                                     ]
                                 )
-                                user.secretKey
+                                token
                                 (MilestoneSet milestone)
                           ]
 
@@ -344,10 +352,10 @@ update msg model =
 
         MilestoneSet m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueOpen m
-                        , fetchIssues user.secretKey Icebox
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueOpen m
+                        , fetchIssues token Icebox
                         ]
 
                     Nothing ->
@@ -356,10 +364,10 @@ update msg model =
 
         IssueRestarted m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueClosed m
-                        , fetchIssues user.secretKey Current
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueClosed m
+                        , fetchIssues token Current
                         ]
 
                     Nothing ->
@@ -368,10 +376,10 @@ update msg model =
 
         IssueStarted m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueOpen m
-                        , fetchIssues user.secretKey Current
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueOpen m
+                        , fetchIssues token Current
                         ]
 
                     Nothing ->
@@ -380,10 +388,10 @@ update msg model =
 
         IssueFinished m result ->
             { model | lockedIssueNumber = "" }
-                ! (case model.user of
-                    Just user ->
-                        [ fetchMilestoneIssues user.secretKey IssueClosed m
-                        , fetchIssues user.secretKey Current
+                ! (case model.accessToken of
+                    Just token ->
+                        [ fetchMilestoneIssues token IssueClosed m
+                        , fetchIssues token Current
                         ]
 
                     Nothing ->
@@ -394,15 +402,15 @@ update msg model =
             { model | pickMilestoneForIssue = Nothing } ! []
 
         IssueAction issue action ->
-            case model.user of
-                Just user ->
+            case model.accessToken of
+                Just token ->
                     case action of
                         "unplan" ->
                             case issue.milestone of
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
-                                                |> updateIssue issue user.secretKey
+                                                |> updateIssue issue token
                                           ]
 
                                 Nothing ->
@@ -423,7 +431,7 @@ update msg model =
                                                       )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueStarted m)
                                           ]
 
@@ -446,7 +454,7 @@ update msg model =
                                                     , ( "state", Encode.string "closed" )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueFinished m)
                                           ]
 
@@ -470,7 +478,7 @@ update msg model =
                                                     , ( "state", Encode.string "open" )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueRestarted m)
                                           ]
 
@@ -495,7 +503,7 @@ update msg model =
                                                       )
                                                     ]
                                                 )
-                                                user.secretKey
+                                                token
                                                 (IssueStarted m)
                                           ]
 
@@ -605,18 +613,28 @@ view model =
                     ]
 
             Nothing ->
-                div []
-                    [ text "cheers. visit "
-                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
-                    , text " (we need 'repo' access granted to see all private repositories)"
-                    , Html.br [] []
-                    , text "and fill this input "
-                    , Html.input [ onInput EditAccessToken ] []
-                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
-                    ]
+                case model.accessToken of
+                    Nothing ->
+                        case model.error of
+                            Just err ->
+                                div [] [ text err ]
+
+                            Nothing ->
+                                div []
+                                    [ text "cheers. visit "
+                                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
+                                    , text " (we need 'repo' access granted to see all private repositories)"
+                                    , Html.br [] []
+                                    , text "and fill this input "
+                                    , Html.input [ onInput EditAccessToken ] []
+                                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
+                                    ]
+
+                    Just _ ->
+                        div [] [ text "Bear with me. I'm currently loading user information..." ]
 
 
-viewPage : AppUser -> Model -> Maybe Route -> Html Msg
+viewPage : User -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
     let
         displayIssuesWithinMilestones milestones issueState highlightStory =
@@ -913,7 +931,7 @@ listIssues issues col lockedIssueNumber highlightStory =
                             [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
-                                [ style [ ( "color", getPriorityColor issue ) ]
+                                [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
                                 , onClick <| SelectStory issue
                                 ]
                                 [ text <| " " ++ issue.title ++ " " ]
@@ -1010,7 +1028,7 @@ textareaStyle =
         ]
 
 
-viewTopbar : AppUser -> Location -> Html msg
+viewTopbar : User -> Location -> Html msg
 viewTopbar user location =
     div []
         [ div

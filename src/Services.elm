@@ -8,6 +8,7 @@ import Messages exposing (..)
 import Decoders exposing (..)
 import Models exposing (..)
 import Json.Encode as Encode
+import Dict
 
 
 -- import Json.Encode as Encode
@@ -241,3 +242,31 @@ fetchMilestones accessToken =
         , withCredentials = False
         }
             |> Http.send LoadMilestones
+
+
+fetchUser : String -> Cmd Msg
+fetchUser accessToken =
+    Http.request
+        { method = "GET"
+        , headers = [ Http.header "If-Modified-Since" "0"]
+        , url =
+            "https://api.github.com/user?access_token="
+                ++ accessToken
+        , expect = Http.expectStringResponse (\res ->
+            let
+                hasRepoOauthScope =
+                    Dict.get "X-OAuth-Scopes" res.headers
+                        |> Maybe.withDefault ""
+                        |> String.split ", "
+                        |> List.member "repo"
+            in
+                if hasRepoOauthScope then
+                    Decode.decodeString userDecoder res.body
+                else
+                    Err "Insufficient permissions: 'repo' oauth scope is required"
+                )
+        , body = Http.emptyBody
+        , timeout = Nothing
+        , withCredentials = False
+        }
+            |> Http.send LoadUser

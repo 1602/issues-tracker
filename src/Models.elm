@@ -18,14 +18,7 @@ type IssueState = IssueOpen | IssueClosed
 
 
 type alias PersistedData =
-    { user : Maybe AppUser
-    }
-
-
-type alias AppUser =
-    { login : String
-    , avatar : String
-    , secretKey : String
+    { accessToken : Maybe String
     }
 
 

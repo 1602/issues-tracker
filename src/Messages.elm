@@ -21,6 +21,7 @@ type Msg
     | IssueStarted Milestone (Result Error Issue)
     | IssueRestarted Milestone (Result Error Issue)
     | IssueFinished Milestone (Result Error Issue)
+    | LoadUser (Result Error User)
     | IssueAction Issue String
     | CopyText String
     | EditAccessToken String
