@@ -253,12 +253,17 @@ fetchUser accessToken =
             "https://api.github.com/user?access_token="
                 ++ accessToken
         , expect = Http.expectStringResponse (\res ->
-            if Dict.get "X-OAuth-Scopes" res.headers |> Maybe.withDefault "" |> String.contains "repo" then
-                res.body
-                    |> Decode.decodeString userDecoder
-            else
-                Err "Insufficient permissions"
-            )
+            let
+                hasRepoOauthScope =
+                    Dict.get "X-OAuth-Scopes" res.headers
+                        |> Maybe.withDefault ""
+                        |> String.contains "repo"
+            in
+                if hasRepoOauthScope then
+                    Decode.decodeString userDecoder res.body
+                else
+                    Err "Insufficient permissions: 'repo' oauth scope is required"
+                )
         , body = Http.emptyBody
         , timeout = Nothing
         , withCredentials = False
