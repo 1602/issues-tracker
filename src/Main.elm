@@ -910,7 +910,7 @@ listIssues issues col lockedIssueNumber highlightStory =
                             [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
-                                [ style [ ( "color", getPriorityColor issue ) ]
+                                [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
                                 , onClick <| SelectStory issue
                                 ]
                                 [ text <| " " ++ issue.title ++ " " ]
