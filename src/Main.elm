@@ -116,32 +116,27 @@ loadAllIssues accessToken =
 
 loadResource : Model -> List (Cmd Msg)
 loadResource model =
-    let
-        page =
-            parseHash model.location
+    case model.currentIssues of
+        Nothing ->
+            case model.user of
+                Just user ->
+                    case parseHash model.location of
+                        Just (Story id) ->
+                            loadAllIssues user.secretKey
 
-    in
-        case model.currentIssues of
-            Nothing ->
-                case model.user of
-                    Just user ->
-                        case page of
-                            Just (Story id) ->
-                                loadAllIssues user.secretKey
+                        Just IssuesIndex ->
+                            loadAllIssues user.secretKey
 
-                            Just IssuesIndex ->
-                                loadAllIssues user.secretKey
+                        Just MilestonesIndex ->
+                            loadAllIssues user.secretKey
 
-                            Just MilestonesIndex ->
-                                loadAllIssues user.secretKey
+                        Nothing ->
+                            loadAllIssues user.secretKey
 
-                            Nothing ->
-                                loadAllIssues user.secretKey
+                Nothing ->
+                    []
 
-                    Nothing ->
-                        []
-
-            _ -> []
+        _ -> []
 
 
 port googleAuth : (String -> msg) -> Sub msg
@@ -184,11 +179,13 @@ update msg model =
 
                 user =
                     Just <| AppUser "" "" token
+
+                updatedModel = { model | user = user }
             in
                 if token == "" then
                     model ! [Navigation.load "https://github.com/settings/tokens"]
                 else
-                    { model | user = user } ! ((saveData <| PersistedData user) :: (loadResource model))
+                    updatedModel ! ((saveData <| PersistedData user) :: (loadResource updatedModel))
 
 
         CurrentDate now ->
