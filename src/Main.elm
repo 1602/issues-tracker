@@ -605,15 +605,20 @@ view model =
                     ]
 
             Nothing ->
-                div []
-                    [ text "cheers. visit "
-                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
-                    , text " (we need 'repo' access granted to see all private repositories)"
-                    , Html.br [] []
-                    , text "and fill this input "
-                    , Html.input [ onInput EditAccessToken ] []
-                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
-                    ]
+                case model.accessToken of
+                    Nothing ->
+                        div []
+                            [ text "cheers. visit "
+                            , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
+                            , text " (we need 'repo' access granted to see all private repositories)"
+                            , Html.br [] []
+                            , text "and fill this input "
+                            , Html.input [ onInput EditAccessToken ] []
+                            , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
+                            ]
+
+                    Just _ ->
+                        div [] [ text "Bear the me. I'm currently loading user information..." ]
 
 
 viewPage : User -> Model -> Maybe Route -> Html Msg
