@@ -10,7 +10,7 @@ try {
         delete appData.user;
     }
 } catch(e) {
-    appData = { user: null };
+    appData = { accessToken: null };
 }
 
 // inject bundled Elm app into div#main
