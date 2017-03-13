@@ -11,8 +11,7 @@
   "scripts": {
     "start": "webpack-dev-server --hot --inline --content-base src/ --port 8088",
     "build": "rimraf dist && webpack",
-    "deploy": "gh-pages -d dist",
-    "reinstall": "rimraf node_modules && npm uninstall -g elm && npm i -g elm && npm i && elm package install"
+    "deploy": "gh-pages -d dist -a"
   },
   "devDependencies": {
     "autoprefixer": "^6.3.6",
