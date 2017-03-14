@@ -255,7 +255,7 @@ fetchUser accessToken =
         , expect = Http.expectStringResponse (\res ->
             let
                 hasRepoOauthScope =
-                    Dict.get "X-OAuth-Scopes" res.headers
+                    Dict.get "X-Oauth-Scopes" res.headers
                         |> Maybe.withDefault ""
                         |> String.split ", "
                         |> List.member "repo"
