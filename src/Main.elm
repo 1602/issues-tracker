@@ -38,7 +38,25 @@ main =
         }
 
 
-
+extractRepo : String -> String
+extractRepo hash =
+    hash
+        |> String.split "/"
+        |> List.drop 1
+        |> List.take 2
+        |> String.join "/"
+        |> (\s ->
+            if s == "" || s == "/" then
+                "universalbasket/engineering"
+            else if hash == "#/stories" then
+                "universalbasket/engineering/stories"
+            else if hash == "#/milestones" then
+                "universalbasket/engineering/milestones"
+            else if String.startsWith "#/stories/" hash then
+                "universalbasket/engineering" ++ (String.dropLeft 1 hash)
+            else
+                s
+        )
 -- MODEL
 
 
@@ -46,6 +64,7 @@ type alias Model =
     { user : Maybe User
     , token : String
     , accessToken : Maybe String
+    , repo : String
     , location : Location
     , now : Date.Date
     , error : Maybe String
@@ -55,6 +74,7 @@ type alias Model =
     , milestones : Maybe (Dict.Dict String ExpandedMilestone)
     , pickMilestoneForIssue : Maybe Issue
     , lockedIssueNumber : String
+    , newMilestoneTitle : String
     }
 
 
@@ -66,6 +86,7 @@ init persistentData location =
                 Nothing
                 ""
                 persistentData.accessToken
+                (extractRepo location.hash)
                 location
                 (Date.fromTime <| Time.millisecond * (toFloat 0))
                 Nothing
@@ -74,6 +95,7 @@ init persistentData location =
                 Nothing
                 Nothing
                 Nothing
+                ""
                 ""
     in
         model ! ([ Task.perform CurrentDate Date.now
@@ -86,7 +108,7 @@ init persistentData location =
                     Cmd.none
            , case parseHash location of
                Nothing ->
-                   Navigation.modifyUrl "#/stories"
+                   Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories"
                Just _ ->
                     Cmd.none
            ]
@@ -101,18 +123,18 @@ aboutToLoadResource loc model =
             parseHash loc
     in
         case page of
-            Just IssuesIndex ->
+            Just (IssuesIndex user repo) ->
                 model
 
             _ ->
                 model
 
 
-loadAllIssues : String -> List (Cmd Msg)
-loadAllIssues accessToken =
-    [ fetchIssues accessToken Current
-    , fetchIssues accessToken Icebox
-    , fetchMilestones accessToken
+loadAllIssues : String -> String -> List (Cmd Msg)
+loadAllIssues repo accessToken =
+    [ fetchIssues repo accessToken Current
+    , fetchIssues repo accessToken Icebox
+    , fetchMilestones repo accessToken
     ]
 
 
@@ -125,17 +147,17 @@ loadResource model =
                     case model.accessToken of
                         Just token ->
                             case parseHash model.location of
-                                Just (Story id) ->
-                                    loadAllIssues token
+                                Just (Story user repo id) ->
+                                    loadAllIssues model.repo token
 
-                                Just IssuesIndex ->
-                                    loadAllIssues token
+                                Just (IssuesIndex user repo) ->
+                                    loadAllIssues model.repo token
 
-                                Just MilestonesIndex ->
-                                    loadAllIssues token
+                                Just (MilestonesIndex user repo) ->
+                                    loadAllIssues model.repo token
 
                                 Nothing ->
-                                    loadAllIssues token
+                                    loadAllIssues model.repo token
 
                         Nothing ->
                             []
@@ -160,7 +182,7 @@ port clipboard : String -> Cmd msg
 focus : Location -> Cmd Msg
 focus loc =
     case parseHash loc of
-        Just (Story n) ->
+        Just (Story user repo n) ->
             "story-" ++ n
                 |> Dom.focus
                 |> Task.attempt (\s -> Debug.log (toString s) NoOp)
@@ -174,6 +196,14 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        EditNewMilestoneTitle s ->
+            { model | newMilestoneTitle = s } ! []
+
+        CreateNewMilestone ->
+            { model | newMilestoneTitle = "" } ! [
+                createMilestone model.repo model.newMilestoneTitle model.accessToken
+            ]
 
         EditAccessToken s ->
             { model | token = s } ! []
@@ -206,7 +236,7 @@ update msg model =
             { model | now = Date.fromTime now }
                 ! (case model.accessToken of
                     Just token ->
-                        loadAllIssues token
+                        loadAllIssues model.repo token
 
                     Nothing ->
                         []
@@ -214,21 +244,21 @@ update msg model =
 
         SelectStory issue ->
             case parseHash model.location of
-                Just (Story n) ->
+                Just (Story user repo n) ->
                     model ! [ if issue.number == n then
-                        Navigation.modifyUrl <| "#/stories"
+                        Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories"
                     else
-                        Navigation.modifyUrl <| "#/stories/" ++ issue.number
+                        Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
                         ]
 
-                Just IssuesIndex ->
-                    model ! [ Navigation.modifyUrl <| "#/stories/" ++ issue.number ]
+                Just (IssuesIndex user repo) ->
+                    model ! [ Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories/" ++ issue.number ]
 
                 _ ->
                     model ! []
 
         UrlChange location ->
-            ({ model | location = location }
+            ({ model | location = location, repo = extractRepo location.hash }
                 |> aboutToLoadResource location
             )
                 ! loadResource model
@@ -289,12 +319,20 @@ update msg model =
                     }
                         ! (case model.accessToken of
                             Just token ->
-                                (milestones |> List.map (fetchMilestoneIssues token IssueOpen))
-                                    ++ (milestones |> List.map (fetchMilestoneIssues token IssueClosed))
+                                (milestones |> List.map (fetchMilestoneIssues model.repo token IssueOpen))
+                                    ++ (milestones |> List.map (fetchMilestoneIssues model.repo token IssueClosed))
 
                             Nothing ->
                                 []
                           )
+        MilestoneCreated result ->
+            case result of
+                Ok _ ->
+                    { model | error = Nothing } ! [
+                        fetchMilestones model.repo (Maybe.withDefault "" model.accessToken)
+                        ]
+                Err e ->
+                    { model | error = toString e |> Just } ! []
 
         IssuesLoaded column result ->
             case result of
@@ -320,8 +358,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues token IssueOpen m
-                        , fetchIssues token Icebox
+                        [ fetchMilestoneIssues model.repo token IssueOpen m
+                        , fetchIssues model.repo token Icebox
                         ]
 
                     Nothing ->
@@ -332,7 +370,7 @@ update msg model =
             case model.accessToken of
                 Just token ->
                     { model | pickMilestoneForIssue = Nothing, lockedIssueNumber = issue.number }
-                        ! [ updateIssueWith issue.number
+                        ! [ updateIssueWith model.repo issue.number
                                 (Encode.object
                                     [ ( "milestone"
                                       , milestone.number
@@ -354,8 +392,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues token IssueOpen m
-                        , fetchIssues token Icebox
+                        [ fetchMilestoneIssues model.repo token IssueOpen m
+                        , fetchIssues model.repo token Icebox
                         ]
 
                     Nothing ->
@@ -366,8 +404,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues token IssueClosed m
-                        , fetchIssues token Current
+                        [ fetchMilestoneIssues model.repo token IssueClosed m
+                        , fetchIssues model.repo token Current
                         ]
 
                     Nothing ->
@@ -378,8 +416,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues token IssueOpen m
-                        , fetchIssues token Current
+                        [ fetchMilestoneIssues model.repo token IssueOpen m
+                        , fetchIssues model.repo token Current
                         ]
 
                     Nothing ->
@@ -390,8 +428,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues token IssueClosed m
-                        , fetchIssues token Current
+                        [ fetchMilestoneIssues model.repo token IssueClosed m
+                        , fetchIssues model.repo token Current
                         ]
 
                     Nothing ->
@@ -410,7 +448,7 @@ update msg model =
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
-                                                |> updateIssue issue token
+                                                |> updateIssue model.repo issue token
                                           ]
 
                                 Nothing ->
@@ -419,21 +457,28 @@ update msg model =
                         "start" ->
                             case issue.milestone of
                                 Just m ->
-                                    { model | lockedIssueNumber = issue.number }
-                                        ! [ updateIssueWith issue.number
-                                                (Encode.object
-                                                    [ ( "labels"
-                                                      , issue.labels
-                                                            |> List.map .name
-                                                            |> (::) "Status: In Progress"
-                                                            |> List.map Encode.string
-                                                            |> Encode.list
-                                                      )
-                                                    ]
-                                                )
-                                                token
-                                                (IssueStarted m)
-                                          ]
+                                    case model.user of
+                                        Just user ->
+                                            { model | lockedIssueNumber = issue.number }
+                                                ! [ updateIssueWith model.repo issue.number
+                                                        (Encode.object
+                                                            [ ( "labels"
+                                                              , issue.labels
+                                                                    |> List.map .name
+                                                                    |> (::) "Status: In Progress"
+                                                                    |> List.map Encode.string
+                                                                    |> Encode.list
+                                                              )
+                                                            , ( "assignees"
+                                                              , [ Encode.string user.login ] |> Encode.list
+                                                              )
+                                                            ]
+                                                        )
+                                                        token
+                                                        (IssueStarted m)
+                                                  ]
+                                        Nothing ->
+                                            model ! []
 
                                 Nothing ->
                                     model ! []
@@ -442,7 +487,7 @@ update msg model =
                             case issue.milestone of
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
-                                        ! [ updateIssueWith issue.number
+                                        ! [ updateIssueWith model.repo issue.number
                                                 (Encode.object
                                                     [ ( "labels"
                                                       , issue.labels
@@ -465,7 +510,7 @@ update msg model =
                             case issue.milestone of
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
-                                        ! [ updateIssueWith issue.number
+                                        ! [ updateIssueWith model.repo issue.number
                                                 (Encode.object
                                                     [ ( "labels"
                                                       , issue.labels
@@ -492,7 +537,7 @@ update msg model =
                             case issue.milestone of
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
-                                        ! [ updateIssueWith issue.number
+                                        ! [ updateIssueWith model.repo issue.number
                                                 (Encode.object
                                                     [ ( "labels"
                                                       , issue.labels
@@ -603,6 +648,14 @@ view model =
                                         (\s ->
                                             Html.li [ style [ ( "list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
                                         )
+                                    |> (\list -> list ++
+                                        [
+                                            Html.li [ style [ ( "list-style", "none" ) ] ]
+                                                [ Html.label [] [ text "New milestone" ]
+                                                , Html.input [ onInput EditNewMilestoneTitle ] []
+                                                , Html.button [ onClick CreateNewMilestone ] [ text "Create" ]
+                                                ]
+                                        ])
                                     |> Html.ul []
                                 , Html.hr [] []
                                 , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
@@ -772,13 +825,13 @@ viewPage user model route =
 
             Just r ->
                 case r of
-                    Story id ->
+                    Story user repo id ->
                         issuesIndex id
 
-                    IssuesIndex ->
+                    IssuesIndex user repo ->
                         issuesIndex ""
 
-                    MilestonesIndex ->
+                    MilestonesIndex user repo ->
                         milestonesIndex
 
 

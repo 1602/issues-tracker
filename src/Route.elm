@@ -5,18 +5,22 @@ import UrlParser exposing (Parser, (</>), s, int, string, map, oneOf)
 import Navigation exposing (Location)
 
 type Route
-    = IssuesIndex
-    | Story String
-    | MilestonesIndex
+    = IssuesIndex String String
+    | Story String String String
+    | MilestonesIndex String String
 
 
 route : Parser (Route -> a) a
 route =
-    oneOf
-        [ map IssuesIndex (s "stories")
-        , map MilestonesIndex (s "milestones")
-        , map Story (s "stories" </> string)
-        ]
+    let
+        repo =
+            1--(string </> string </> identity)
+    in
+        oneOf
+            [ map IssuesIndex (string </> string </> s "stories")
+            , map MilestonesIndex (string </> string </> s  "milestones")
+            , map Story (string </> string </> s "stories" </> string)
+            ]
 
 parseHash : Location -> Maybe Route
 parseHash loc =

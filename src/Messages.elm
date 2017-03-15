@@ -18,6 +18,7 @@ type Msg
     | UnsetMilestone Milestone (Result Error Issue)
     | SetMilestone Issue Milestone
     | MilestoneSet Milestone (Result Error Issue)
+    | MilestoneCreated (Result Error Milestone)
     | IssueStarted Milestone (Result Error Issue)
     | IssueRestarted Milestone (Result Error Issue)
     | IssueFinished Milestone (Result Error Issue)
@@ -28,4 +29,6 @@ type Msg
     | SaveAccessToken
     | DismissPlanningIssue
     | SelectStory Issue
+    | EditNewMilestoneTitle String
+    | CreateNewMilestone
 

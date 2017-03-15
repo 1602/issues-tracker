@@ -50,7 +50,7 @@ type alias Milestone =
     , number : Id
     , state : String
     , title : String
-    , description : String
+    , description : Maybe String
     --, creator : User
     , openIssues : Int
     , closedIssues : Int

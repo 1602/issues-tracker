@@ -21,11 +21,6 @@ env =
     "beta"
 
 
-repo : String
-repo =
-    "universalbasket/engineering"
-
-
 authHeader : String -> Http.Header
 authHeader secretKey =
     Http.header "Authorization" <|
@@ -79,9 +74,26 @@ fetchBacklog accessToken =
             |> Task.andThen fetchIssuesForMilestones)
         -}
 
+createMilestone : String -> String -> Maybe String -> Cmd Msg
+createMilestone repo title accessToken =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url =
+            "https://api.github.com/repos/" ++ repo ++ "/milestones"
+            ++ "?access_token=" ++ (Maybe.withDefault "" accessToken)
+        , expect = Http.expectJson <| milestoneDecoder
+        , body = Http.jsonBody <|
+            Encode.object
+                [ ( "title", Encode.string title )
+                ]
+        , timeout = Nothing
+        , withCredentials = False
+        }
+            |> Http.send MilestoneCreated
 
-fetchMilestoneIssues : String -> IssueState -> Milestone -> Cmd Msg
-fetchMilestoneIssues accessToken issueState ms =
+fetchMilestoneIssues : String -> String -> IssueState -> Milestone -> Cmd Msg
+fetchMilestoneIssues repo accessToken issueState ms =
     let
         state =
             case issueState of
@@ -108,8 +120,8 @@ fetchMilestoneIssues accessToken issueState ms =
             }
                 |> Http.send (MilestoneIssuesLoaded ms.number issueState)
 
-fetchIssues : String -> Column -> Cmd Msg
-fetchIssues accessToken column =
+fetchIssues : String -> String -> Column -> Cmd Msg
+fetchIssues repo accessToken column =
     let
         milestone =
             case column of
@@ -159,8 +171,8 @@ fetchIssues accessToken column =
             }
             |> Http.send (IssuesLoaded column)
 
-updateIssueWith : String -> Decode.Value -> String -> (Result Error Issue -> a) -> Cmd a
-updateIssueWith issueNumber issue accessToken onComplete =
+updateIssueWith : String -> String -> Decode.Value -> String -> (Result Error Issue -> a) -> Cmd a
+updateIssueWith repo issueNumber issue accessToken onComplete =
     Http.request
         { method = "PATCH"
         , headers = []
@@ -178,8 +190,8 @@ updateIssueWith issueNumber issue accessToken onComplete =
         }
         |> Http.send onComplete
 
-updateIssue : Issue -> String -> (Result Error Issue -> a) -> Cmd a
-updateIssue issue accessToken onComplete =
+updateIssue : String -> Issue -> String -> (Result Error Issue -> a) -> Cmd a
+updateIssue repo issue accessToken onComplete =
     Http.request
         { method = "PATCH"
         , headers = []
@@ -226,8 +238,8 @@ updateIssue issue accessToken onComplete =
         |> Http.send onComplete
 
 
-fetchMilestones : String -> Cmd Msg
-fetchMilestones accessToken =
+fetchMilestones : String -> String -> Cmd Msg
+fetchMilestones repo accessToken =
     Http.request
         { method = "GET"
         , headers = [ Http.header "If-Modified-Since" "0"]

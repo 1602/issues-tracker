@@ -68,7 +68,7 @@ milestoneDecoder =
         (field "number" decodeIntToString)
         (field "state" Decode.string)
         (field "title" Decode.string)
-        (field "description" Decode.string)
+        (maybe <| field "description" Decode.string)
         -- (field "creator" userDecoder)
         (field "open_issues" Decode.int)
         (field "closed_issues" Decode.int)
