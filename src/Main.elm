@@ -75,12 +75,23 @@ type alias Model =
     , pickMilestoneForIssue : Maybe Issue
     , lockedIssueNumber : String
     , newMilestoneTitle : String
+    , needFocus : Bool
     }
 
 
 init : PersistedData -> Location -> ( Model, Cmd Msg )
 init persistentData location =
     let
+        page =
+            parseHash location
+
+        isStory =
+            case page of
+                Just (Story _ _ _) ->
+                    True
+
+                _ -> False
+
         model =
             Model
                 Nothing
@@ -97,6 +108,7 @@ init persistentData location =
                 Nothing
                 ""
                 ""
+                isStory -- needFocus
     in
         model ! ([ Task.perform CurrentDate Date.now
            , case persistentData.accessToken of
@@ -106,7 +118,7 @@ init persistentData location =
                 --fetchClients user.secretKey
                 Nothing ->
                     Cmd.none
-           , case parseHash location of
+           , case page of
                Nothing ->
                    Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories"
                Just _ ->
@@ -185,7 +197,10 @@ focus loc =
         Just (Story user repo n) ->
             "story-" ++ n
                 |> Dom.focus
-                |> Task.attempt (\s -> Debug.log (toString s) NoOp)
+                |> Task.attempt (\s -> case s of
+                    Ok _ -> StoryFocused
+                    Err _ -> NoOp
+                )
 
         _ ->
             Cmd.none
@@ -196,6 +211,9 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        StoryFocused ->
+            { model | needFocus = False } ! []
 
         EditNewMilestoneTitle s ->
             { model | newMilestoneTitle = s } ! []
@@ -258,10 +276,32 @@ update msg model =
                     model ! []
 
         UrlChange location ->
-            ({ model | location = location, repo = extractRepo location.hash }
-                |> aboutToLoadResource location
-            )
-                ! loadResource model
+            let
+                repo =
+                    extractRepo location.hash
+
+                issues =
+                    if repo == model.repo then
+                        model.currentIssues
+                    else
+                        Nothing
+
+                milestones =
+                    if repo == model.repo then
+                        model.milestones
+                    else
+                        Nothing
+
+                updatedModel = ({ model
+                    | location = location
+                    , repo = repo
+                    , currentIssues = issues
+                    , milestones = milestones
+                }
+                    |> aboutToLoadResource location
+                )
+            in
+                updatedModel ! loadResource updatedModel
 
         MilestoneIssuesLoaded num issueState result ->
             case result of
@@ -269,27 +309,69 @@ update msg model =
                     { model | error = Just (toString error) } ! []
 
                 Ok issues ->
-                    { model
-                        | milestones =
-                            Just
-                                (Maybe.withDefault Dict.empty model.milestones
-                                    |> Dict.update num
-                                        (\s ->
-                                            case s of
-                                                Just ms ->
-                                                    case issueState of
-                                                        IssueOpen ->
-                                                            Just { ms | openIssues = Just issues }
+                    let
+                        updatedModel = { model
+                            | milestones =
+                                Just
+                                    (Maybe.withDefault Dict.empty model.milestones
+                                        |> Dict.update num
+                                            (\s ->
+                                                case s of
+                                                    Just ms ->
+                                                        case issueState of
+                                                            IssueOpen ->
+                                                                Just { ms | openIssues = Just issues }
 
-                                                        IssueClosed ->
-                                                            Just { ms | closedIssues = Just issues }
+                                                            IssueClosed ->
+                                                                Just { ms | closedIssues = Just issues }
 
-                                                Nothing ->
-                                                    Nothing
-                                        )
-                                )
-                    }
-                        ! [ focus model.location ]
+                                                    Nothing ->
+                                                        Nothing
+                                            )
+                                    )
+                        }
+
+                        mss =
+                            case updatedModel.milestones of
+                                Just milestones ->
+                                    Dict.values milestones
+
+                                Nothing ->
+                                    []
+
+                        loaded =
+                            List.foldl (\ms res ->
+                                case issueState of
+                                    IssueClosed ->
+                                        case ms.closedIssues of
+                                            Nothing ->
+                                                if ms.milestone.closedIssues > 0 then
+                                                    res
+                                                else
+                                                    res + 1
+                                            Just _ ->
+                                                res + 1
+                                    IssueOpen ->
+                                        case ms.openIssues of
+                                            Nothing ->
+                                                if ms.milestone.openIssues > 0 then
+                                                    res
+                                                else
+                                                    res + 1
+                                            Just _ ->
+                                                res + 1
+                                ) 0 mss
+
+                        isFullyLoaded =
+                            (List.length mss) == loaded
+                    in
+                        updatedModel
+                            ! (
+                                if isFullyLoaded && model.needFocus then
+                                    [ focus model.location ]
+                                else
+                                    []
+                            )
 
         LoadMilestones result ->
             case result of
@@ -319,8 +401,13 @@ update msg model =
                     }
                         ! (case model.accessToken of
                             Just token ->
-                                (milestones |> List.map (fetchMilestoneIssues model.repo token IssueOpen))
-                                    ++ (milestones |> List.map (fetchMilestoneIssues model.repo token IssueClosed))
+                                (milestones
+                                    |> List.filter (\ms -> ms.openIssues > 0)
+                                    |> List.map (fetchMilestoneIssues model.repo token IssueOpen))
+                                ++
+                                (milestones
+                                    |> List.filter (\ms -> ms.closedIssues > 0)
+                                    |> List.map (fetchMilestoneIssues model.repo token IssueClosed))
 
                             Nothing ->
                                 []
@@ -340,11 +427,21 @@ update msg model =
                     case column of
                         Current ->
                             { model | currentIssues = Just issues, error = Nothing }
-                            ! [ focus model.location ]
+                            ! (
+                                if model.needFocus then
+                                    [ focus model.location ]
+                                else
+                                    []
+                                )
 
                         Icebox ->
                             { model | iceboxIssues = Just issues, error = Nothing }
-                            ! [ focus model.location ]
+                            ! (
+                                if model.needFocus then
+                                    [ focus model.location ]
+                                else
+                                    []
+                                )
 
                         _ ->
                             model ! []
@@ -702,13 +799,19 @@ viewPage user model route =
                                     IssueClosed ->
                                         case ms.closedIssues of
                                             Nothing ->
-                                                res
+                                                if ms.milestone.closedIssues > 0 then
+                                                    res
+                                                else
+                                                    res + 1
                                             Just _ ->
                                                 res + 1
                                     IssueOpen ->
                                         case ms.openIssues of
                                             Nothing ->
-                                                res
+                                                if ms.milestone.openIssues > 0 then
+                                                    res
+                                                else
+                                                    res + 1
                                             Just _ ->
                                                 res + 1
                                 ) 0 mss
@@ -853,6 +956,14 @@ listIssuesWithinMilestones milestones issueState now lockedIssueNumber highlight
         |> List.map
             (\expandedMilestone ->
                 let
+                    hasIssues =
+                        case issueState of
+                            IssueOpen ->
+                                expandedMilestone.milestone.openIssues > 0
+
+                            IssueClosed ->
+                                expandedMilestone.milestone.closedIssues > 0
+
                     filterOutInProgress issues =
                         issues
                             |> List.filter
@@ -885,22 +996,25 @@ listIssuesWithinMilestones milestones issueState now lockedIssueNumber highlight
                             IssueClosed ->
                                 displayIssuesOrLoading expandedMilestone.closedIssues
                 in
-                    div []
-                        [ span [ cellStyle "400px" ]
-                            [ Html.strong [ style [ ( "color", "yellowgreen" ), ( "line-height", "22px" ), ( "font-size", "14px" ) ] ]
-                                [ text <| "🏁 " ++ expandedMilestone.milestone.title ]
-                            , case expandedMilestone.milestone.dueOn of
-                                Just date ->
-                                    if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
-                                        text " overdue"
-                                    else
-                                        text <| " due in " ++ (Distance.inWords now date)
+                    if hasIssues then
+                        div []
+                            [ span [ cellStyle "400px" ]
+                                [ Html.strong [ style [ ( "color", "yellowgreen" ), ( "line-height", "22px" ), ( "font-size", "14px" ) ] ]
+                                    [ text <| "🏁 " ++ expandedMilestone.milestone.title ]
+                                , case expandedMilestone.milestone.dueOn of
+                                    Just date ->
+                                        if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
+                                            text " overdue"
+                                        else
+                                            text <| " due in " ++ (Distance.inWords now date)
 
-                                Nothing ->
-                                    text " (no due date)"
+                                    Nothing ->
+                                        text " (no due date)"
+                                ]
+                            , issues
                             ]
-                        , issues
-                        ]
+                    else
+                        text ""
             )
         |> div []
 
@@ -1110,8 +1224,19 @@ viewTopbar user location =
 viewLink : String -> Html msg -> Location -> Html msg
 viewLink src childNode location =
     let
+        repo =
+            location.hash
+                |> String.split "/"
+                |> List.drop 1
+                |> List.take 2
+                |> String.join "/"
+
         isActive =
-            String.startsWith url location.hash
+            location.hash
+                |> String.split "/"
+                |> List.drop 3
+                |> String.join "/"
+                |> String.startsWith src
 
         color =
             if isActive then
@@ -1120,7 +1245,7 @@ viewLink src childNode location =
                 "rgba(255,255,255, 0.1)"
 
         url =
-            "#/" ++ src
+            "#/" ++ repo ++ "/" ++ src
 
         link =
             if isActive then

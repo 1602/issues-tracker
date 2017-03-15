@@ -31,4 +31,5 @@ type Msg
     | SelectStory Issue
     | EditNewMilestoneTitle String
     | CreateNewMilestone
+    | StoryFocused
 
