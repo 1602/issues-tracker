@@ -358,10 +358,30 @@ update msg model =
                                                         Just ms ->
                                                             case issueState of
                                                                 IssueOpen ->
-                                                                    Just { ms | openIssues = Just issues }
+                                                                    let
+                                                                        m =
+                                                                            ms.milestone
+
+                                                                        updatedMilestone =
+                                                                            { m | openIssues = List.length issues }
+                                                                    in
+                                                                        Just { ms
+                                                                            | openIssues = Just issues
+                                                                            , milestone = updatedMilestone
+                                                                            }
 
                                                                 IssueClosed ->
-                                                                    Just { ms | closedIssues = Just issues }
+                                                                    let
+                                                                        m =
+                                                                            ms.milestone
+
+                                                                        updatedMilestone =
+                                                                            { m | closedIssues = List.length issues }
+                                                                    in
+                                                                        Just { ms
+                                                                            | closedIssues = Just issues
+                                                                            , milestone = m
+                                                                            }
 
                                                         Nothing ->
                                                             Nothing
@@ -1190,88 +1210,91 @@ listIssues head issues col lockedIssueNumber highlightStory =
             else
                 Attrs.class "story not-selected"
     in
-        issues
-            |> List.map
-                (\issue ->
-                    div
-                        [ getStoryClass issue
-                        , Attrs.tabindex 1
-                        , Attrs.id <| "story-" ++ issue.number
-                        , style
-                            [ if issue.number == lockedIssueNumber then
-                                ( "filter", "grayscale(0.5) blur(2px)" )
-                              else
-                                ( "filter", "none" )
-                            ]
-                        ]
-                        [ span [ cellStyle "400px" ]
-                            [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
-                            , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
-                            , Html.a
-                                [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
-                                , onClick <| SelectStory issue
+        if List.isEmpty issues then
+            text ""
+        else
+            issues
+                |> List.map
+                    (\issue ->
+                        div
+                            [ getStoryClass issue
+                            , Attrs.tabindex 1
+                            , Attrs.id <| "story-" ++ issue.number
+                            , style
+                                [ if issue.number == lockedIssueNumber then
+                                    ( "filter", "grayscale(0.5) blur(2px)" )
+                                  else
+                                    ( "filter", "none" )
                                 ]
-                                [ text <| " " ++ issue.title ++ " " ]
-                            , Html.i [ style [ ( "color", "darkgrey" ) ] ]
-                                (if List.length issue.assignees == 0 then
-                                    [ text "(unassigned)" ]
-                                 else
-                                    issue.assignees
-                                        |> List.map
-                                            (\s ->
-                                                Html.img
-                                                    [ src s.avatar, Attrs.width 20, style [ ( "vertical-align", "middle" ) ] ]
-                                                    []
-                                            )
-                                )
-                            , if issue.number == highlightStory then
-                                Html.p [] [ Markdown.toHtml [] issue.description ]
-                              else
-                                text ""
-                            , div [ Attrs.class "buttons" ] <|
-                                case col of
-                                    Backlog ->
-                                        [ button issue "unplan", button issue "start" ]
-
-                                    Icebox ->
-                                        [ button issue "plan"
-                                        , button issue <|
-                                            (if hasLabel "Status: Ready" issue then
-                                                "put on ice"
-                                             else
-                                                "just do it"
-                                            )
-                                        ]
-
-                                    Current ->
-                                        case issue.milestone of
-                                            Just ms ->
-                                                [ button issue "unstart"
-                                                , button issue "finish"
-                                                ]
-
-                                            Nothing ->
-                                                [ button issue "gh" ]
-
-                                    Done ->
-                                        case issue.milestone of
-                                            Just ms ->
-                                                [ button issue "reopen" ]
-
-                                            Nothing ->
-                                                []
                             ]
-                        ]
-                )
-            |> (\list ->
-                    case head of
-                        Just htmlNode ->
-                            (Html.span [ cellStyle "400px" ] [ htmlNode ]) :: list
+                            [ span [ cellStyle "400px" ]
+                                [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
+                                , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
+                                , Html.a
+                                    [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
+                                    , onClick <| SelectStory issue
+                                    ]
+                                    [ text <| " " ++ issue.title ++ " " ]
+                                , Html.i [ style [ ( "color", "darkgrey" ) ] ]
+                                    (if List.length issue.assignees == 0 then
+                                        [ text "(unassigned)" ]
+                                     else
+                                        issue.assignees
+                                            |> List.map
+                                                (\s ->
+                                                    Html.img
+                                                        [ src s.avatar, Attrs.width 20, style [ ( "vertical-align", "middle" ) ] ]
+                                                        []
+                                                )
+                                    )
+                                , if issue.number == highlightStory then
+                                    Html.p [] [ Markdown.toHtml [] issue.description ]
+                                  else
+                                    text ""
+                                , div [ Attrs.class "buttons" ] <|
+                                    case col of
+                                        Backlog ->
+                                            [ button issue "unplan", button issue "start" ]
 
-                        Nothing ->
-                            list
-               )
-            |> div []
+                                        Icebox ->
+                                            [ button issue "plan"
+                                            , button issue <|
+                                                (if hasLabel "Status: Ready" issue then
+                                                    "put on ice"
+                                                 else
+                                                    "just do it"
+                                                )
+                                            ]
+
+                                        Current ->
+                                            case issue.milestone of
+                                                Just ms ->
+                                                    [ button issue "unstart"
+                                                    , button issue "finish"
+                                                    ]
+
+                                                Nothing ->
+                                                    [ button issue "gh" ]
+
+                                        Done ->
+                                            case issue.milestone of
+                                                Just ms ->
+                                                    [ button issue "reopen" ]
+
+                                                Nothing ->
+                                                    []
+                                ]
+                            ]
+                    )
+                |> (\list ->
+                        case head of
+                            Just htmlNode ->
+                                (Html.span [ cellStyle "400px" ] [ htmlNode ]) :: list
+
+                            Nothing ->
+                                list
+                   )
+                |> div []
 
 
 intToDate : Int -> Date.Date
