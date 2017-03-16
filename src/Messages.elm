@@ -32,4 +32,5 @@ type Msg
     | EditNewMilestoneTitle String
     | CreateNewMilestone
     | StoryFocused
+    | UrgentIssueAdded (Result Error Issue)
 
