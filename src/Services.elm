@@ -128,6 +128,9 @@ fetchIssues repo accessToken column =
                 Icebox ->
                     "&milestone=none"
 
+                Done ->
+                    "&milestone=none"
+
                 _ ->
                     ""
 
@@ -143,7 +146,7 @@ fetchIssues repo accessToken column =
                     "&labels=Status: In Progress"
 
                 Done ->
-                    ""
+                    "&labels=Status: Completed"
 
         state =
             case column of

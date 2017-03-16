@@ -167,6 +167,7 @@ loadAllIssues : String -> String -> List (Cmd Msg)
 loadAllIssues repo accessToken =
     [ fetchIssues repo accessToken Current
     , fetchIssues repo accessToken Icebox
+    , fetchIssues repo accessToken Done
     , fetchMilestones repo accessToken
     ]
 
@@ -507,6 +508,14 @@ update msg model =
                                     []
                                   )
 
+                        Done ->
+                            { model | closedIssues = Just issues, error = Nothing }
+                                ! (if model.needFocus then
+                                    [ focus model.location ]
+                                   else
+                                    []
+                                  )
+
                         _ ->
                             model ! []
 
@@ -605,6 +614,7 @@ update msg model =
 
                             Nothing ->
                                 [ fetchIssues model.repo token Current
+                                , fetchIssues model.repo token Done
                                 ]
 
                     Nothing ->
@@ -664,6 +674,7 @@ update msg model =
                                               , issue.labels
                                                     |> List.map .name
                                                     |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> (::) "Status: Completed"
                                                     |> List.map Encode.string
                                                     |> Encode.list
                                               )
@@ -1050,7 +1061,13 @@ viewPage user model route =
                     ]
                 , Html.section []
                     [ Html.h3 [] [ text "🎉 Done ", Html.small [] [ text "(closed issues)" ] ]
-                      -- , displayIssues (Just <| text "We just did it") (\_ -> True ) model.closedIssues Icebox highlightStory
+                    , displayIssues (
+                        "💪 We just did it"
+                        |> text
+                        |> (\s -> [s])
+                        |> Html.strong []
+                        |> Just
+                    ) (\_ -> True ) model.closedIssues Icebox highlightStory
                     , displayIssuesWithinMilestones model.milestones IssueClosed highlightStory
                     ]
                 ]
