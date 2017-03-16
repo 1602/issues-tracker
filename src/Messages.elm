@@ -19,9 +19,9 @@ type Msg
     | SetMilestone Issue Milestone
     | MilestoneSet Milestone (Result Error Issue)
     | MilestoneCreated (Result Error Milestone)
-    | IssueStarted Milestone (Result Error Issue)
+    | IssueStarted (Maybe Milestone) (Result Error Issue)
     | IssueRestarted Milestone (Result Error Issue)
-    | IssueFinished Milestone (Result Error Issue)
+    | IssueFinished (Maybe Milestone) (Result Error Issue)
     | LoadUser (Result Error User)
     | IssueAction Issue String
     | CopyText String

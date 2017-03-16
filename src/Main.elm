@@ -575,13 +575,19 @@ update msg model =
                         []
                   )
 
-        IssueStarted m result ->
+        IssueStarted milestone result ->
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model.repo token IssueOpen m
-                        , fetchIssues model.repo token Current
-                        ]
+                        case milestone of
+                            Just m ->
+                                [ fetchMilestoneIssues model.repo token IssueOpen m
+                                , fetchIssues model.repo token Current
+                                ]
+                            Nothing ->
+                                [ fetchIssues model.repo token Current
+                                , fetchIssues model.repo token Icebox
+                                ]
 
                     Nothing ->
                         []
@@ -591,9 +597,15 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model.repo token IssueClosed m
-                        , fetchIssues model.repo token Current
-                        ]
+                        case m of
+                            Just m ->
+                                [ fetchMilestoneIssues model.repo token IssueClosed m
+                                , fetchIssues model.repo token Current
+                                ]
+
+                            Nothing ->
+                                [ fetchIssues model.repo token Current
+                                ]
 
                     Nothing ->
                         []
@@ -618,39 +630,8 @@ update msg model =
                                     model ! []
 
                         "start" ->
-                            case issue.milestone of
-                                Just m ->
-                                    case model.user of
-                                        Just user ->
-                                            { model | lockedIssueNumber = issue.number }
-                                                ! [ updateIssueWith model.repo
-                                                        issue.number
-                                                        (Encode.object
-                                                            [ ( "labels"
-                                                              , issue.labels
-                                                                    |> List.map .name
-                                                                    |> (::) "Status: In Progress"
-                                                                    |> List.map Encode.string
-                                                                    |> Encode.list
-                                                              )
-                                                            , ( "assignees"
-                                                              , [ Encode.string user.login ] |> Encode.list
-                                                              )
-                                                            ]
-                                                        )
-                                                        token
-                                                        (IssueStarted m)
-                                                  ]
-
-                                        Nothing ->
-                                            model ! []
-
-                                Nothing ->
-                                    model ! []
-
-                        "finish" ->
-                            case issue.milestone of
-                                Just m ->
+                            case model.user of
+                                Just user ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ updateIssueWith model.repo
                                                 issue.number
@@ -658,19 +639,41 @@ update msg model =
                                                     [ ( "labels"
                                                       , issue.labels
                                                             |> List.map .name
-                                                            |> List.filter (\s -> s /= "Status: In Progress")
+                                                            |> (::) "Status: In Progress"
                                                             |> List.map Encode.string
                                                             |> Encode.list
                                                       )
-                                                    , ( "state", Encode.string "closed" )
+                                                    , ( "assignees"
+                                                      , [ Encode.string user.login ] |> Encode.list
+                                                      )
                                                     ]
                                                 )
                                                 token
-                                                (IssueFinished m)
+                                                (IssueStarted issue.milestone)
                                           ]
 
                                 Nothing ->
                                     model ! []
+
+                        "finish" ->
+                            { model | lockedIssueNumber = issue.number }
+                                ! [ updateIssueWith model.repo
+                                        issue.number
+                                        (Encode.object
+                                            [ ( "labels"
+                                              , issue.labels
+                                                    |> List.map .name
+                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.map Encode.string
+                                                    |> Encode.list
+                                              )
+                                            , ( "state", Encode.string "closed" )
+                                            ]
+                                        )
+                                        token
+                                        (IssueFinished issue.milestone)
+                                  ]
+
 
                         "reopen" ->
                             case issue.milestone of
@@ -697,31 +700,23 @@ update msg model =
                                 Nothing ->
                                     model ! []
 
-                        "gh" ->
-                            model ! [ Navigation.load issue.htmlUrl ]
-
                         "unstart" ->
-                            case issue.milestone of
-                                Just m ->
-                                    { model | lockedIssueNumber = issue.number }
-                                        ! [ updateIssueWith model.repo
-                                                issue.number
-                                                (Encode.object
-                                                    [ ( "labels"
-                                                      , issue.labels
-                                                            |> List.map .name
-                                                            |> List.filter (\s -> s /= "Status: In Progress")
-                                                            |> List.map Encode.string
-                                                            |> Encode.list
-                                                      )
-                                                    ]
-                                                )
-                                                token
-                                                (IssueStarted m)
-                                          ]
-
-                                Nothing ->
-                                    model ! []
+                            { model | lockedIssueNumber = issue.number }
+                                ! [ updateIssueWith model.repo
+                                        issue.number
+                                        (Encode.object
+                                            [ ( "labels"
+                                              , issue.labels
+                                                    |> List.map .name
+                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.map Encode.string
+                                                    |> Encode.list
+                                              )
+                                            ]
+                                        )
+                                        token
+                                        (IssueStarted issue.milestone)
+                                  ]
 
                         "plan" ->
                             { model | pickMilestoneForIssue = Just issue } ! []
@@ -1043,7 +1038,7 @@ viewPage user model route =
                             |> Html.strong [ style [ ( "color", "white" ), ( "line-height", "22px" ), ( "font-size", "14px" ) ] ]
                             |> Just
                         )
-                        (hasLabel "Status: Ready")
+                        (\which -> (hasLabel "Status: Ready" which) && (hasNoLabel "Status: In Progress" which))
                         model.iceboxIssues
                         Icebox
                         highlightStory
@@ -1258,6 +1253,7 @@ listIssues head issues col lockedIssueNumber highlightStory =
 
                                         Icebox ->
                                             [ button issue "plan"
+                                            , button issue "start"
                                             , button issue <|
                                                 (if hasLabel "Status: Ready" issue then
                                                     "put on ice"
@@ -1267,14 +1263,9 @@ listIssues head issues col lockedIssueNumber highlightStory =
                                             ]
 
                                         Current ->
-                                            case issue.milestone of
-                                                Just ms ->
-                                                    [ button issue "unstart"
-                                                    , button issue "finish"
-                                                    ]
-
-                                                Nothing ->
-                                                    [ button issue "gh" ]
+                                            [ button issue "unstart"
+                                            , button issue "finish"
+                                            ]
 
                                         Done ->
                                             case issue.milestone of
