@@ -78,8 +78,12 @@ type alias Model =
     , milestones : Maybe (Dict.Dict String ExpandedMilestone)
     , pickMilestoneForIssue : Maybe Issue
     , lockedIssueNumber : String
+    , highlightStory : String
     , newMilestoneTitle : String
+    , newIssueTitle : String
     , needFocus : Bool
+    , addIssueToColumn : Column
+    , addIssueToMilestone : String
     }
 
 
@@ -89,13 +93,13 @@ init persistentData location =
         page =
             parseHash location
 
-        isStory =
+        highlightStory =
             case page of
-                Just (Story _ _ _) ->
-                    True
+                Just (Story _ _ s) ->
+                    s
 
                 _ ->
-                    False
+                    ""
 
         model =
             Model
@@ -112,8 +116,12 @@ init persistentData location =
                 Nothing
                 Nothing
                 ""
+                highlightStory
                 ""
-                isStory
+                ""
+                (highlightStory /= "") -- needs focus
+                Done
+                ""
 
         -- needFocus
     in
@@ -157,10 +165,13 @@ aboutToLoadResource loc model =
     in
         case page of
             Just (IssuesIndex user repo) ->
-                model
+                { model | highlightStory = "" }
+
+            Just (Story _ _ s) ->
+                { model | highlightStory = s }
 
             _ ->
-                model
+                { model | highlightStory = "" }
 
 
 loadAllIssues : String -> String -> List (Cmd Msg)
@@ -243,6 +254,80 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        ShowIssueCreationForm col msn ->
+            { model | addIssueToColumn = col, addIssueToMilestone = msn } ! []
+
+        EditNewStoryTitle s ->
+            { model | newIssueTitle = s } ! []
+
+        CreateStory col milestone ->
+            case model.accessToken of
+                Just token ->
+                    { model | newIssueTitle = "" } ! [ createIssue model.repo token (
+                        [ ( "title", Encode.string model.newIssueTitle )
+                        , ( "body", Encode.string "" )
+                        , ( "labels", Encode.list <| (case col of
+                            Backlog ->
+                                [ Encode.string "Status: Ready" ]
+
+                            Current ->
+                                [ Encode.string "Status: In Progress" ]
+
+                            _ ->
+                                []
+                         ))
+                        , ( "milestone", case milestone of
+                            Just ms ->
+                                ms.number |> String.toInt |> Result.withDefault 0 |> Encode.int
+
+                            Nothing ->
+                                Encode.null
+                          )
+                        , ( "assignees", case col of
+                            Backlog ->
+                                case model.user of
+                                    Just user ->
+                                        Encode.list [ Encode.string user.login ]
+
+                                    Nothing ->
+                                        Encode.list []
+
+                            _ ->
+                                Encode.list []
+                          )
+                        ]
+                            |> Encode.object
+                        )
+                        (StoryCreated col milestone)
+                    ]
+
+                Nothing ->
+                    model ! []
+
+        StoryCreated col milestone result ->
+            case result of
+                Err error ->
+                    { model | error = toString error |> Just } ! []
+                Ok _ ->
+                    case model.accessToken of
+                        Just token ->
+                            model ! [
+                                case col of
+                                    Backlog ->
+                                        case milestone of
+                                            Just ms ->
+                                                fetchMilestoneIssues model.repo token IssueOpen ms
+
+                                            Nothing ->
+                                                fetchIssues model.repo token Icebox
+
+                                    _ ->
+                                        fetchIssues model.repo token col
+                            ]
+
+                        Nothing ->
+                            model ! []
 
         UrgentIssueAdded result ->
             model ! [ fetchIssues model.repo (Maybe.withDefault "" model.accessToken) Icebox ]
@@ -863,8 +948,7 @@ view model =
                                     |> (\list ->
                                             list
                                                 ++ [ Html.li [ style [ ( "list-style", "none" ) ] ]
-                                                        [ Html.label [] [ text "New milestone" ]
-                                                        , Html.input [ onInput EditNewMilestoneTitle ] []
+                                                        [ Html.input [ onInput EditNewMilestoneTitle ] []
                                                         , Html.button [ onClick CreateNewMilestone ] [ text "Create" ]
                                                         ]
                                                    ]
@@ -903,7 +987,7 @@ view model =
 viewPage : User -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
     let
-        displayIssuesWithinMilestones milestones issueState highlightStory =
+        displayIssuesWithinMilestones milestones issueState =
             case milestones of
                 Just milestones ->
                     let
@@ -943,17 +1027,17 @@ viewPage user model route =
                             List.length mss
                     in
                         if total == loaded then
-                            listIssuesWithinMilestones milestones issueState model.now model.lockedIssueNumber highlightStory
+                            listIssuesWithinMilestones milestones issueState model.now model
                         else
                             span [ cellStyle "400px" ] [ text <| "Loading milestones (" ++ (toString loaded) ++ " of " ++ (toString total) ++ ")..." ]
 
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading milestones..." ]
 
-        displayIssues head filter issues col highlightStory =
+        displayIssues head filter issues col addto milestoneNumber =
             case issues of
                 Just issues ->
-                    listIssues head (List.filter filter issues) col model.lockedIssueNumber highlightStory
+                    listIssues head (List.filter filter issues) col model addto milestoneNumber
 
                 Nothing ->
                     span [ cellStyle "400px" ] [ text "Loading..." ]
@@ -1031,7 +1115,7 @@ viewPage user model route =
                 Nothing ->
                     text "Loading..."
 
-        issuesIndex highlightStory =
+        issuesIndex =
             Html.main_
                 [ style
                     [ ( "display", "flex" )
@@ -1040,7 +1124,8 @@ viewPage user model route =
                 ]
                 [ Html.section []
                     [ Html.h3 [] [ text "❄ Icebox ", Html.small [] [ text "(keep this place empty)" ] ]
-                    , displayIssues Nothing (hasNoLabel "Status: Ready") model.iceboxIssues Icebox highlightStory
+                    , displayIssues Nothing (hasNoLabel "Status: Ready") model.iceboxIssues Icebox
+                    Icebox ""
                     ]
                 , Html.section []
                     [ Html.h3 [] [ text "🚥 Backlog ", Html.small [] [ text "(plan all the things via milestones)" ] ]
@@ -1054,12 +1139,12 @@ viewPage user model route =
                         (\which -> (hasLabel "Status: Ready" which) && (hasNoLabel "Status: In Progress" which))
                         model.iceboxIssues
                         Icebox
-                        highlightStory
-                    , displayIssuesWithinMilestones model.milestones IssueOpen highlightStory
+                        Backlog ""
+                    , displayIssuesWithinMilestones model.milestones IssueOpen
                     ]
                 , Html.section []
                     [ Html.h3 [] [ text "🐝 In progress ", Html.small [] [ text "(issues with status 'In Progress')" ] ]
-                    , displayIssues Nothing (\_ -> True) model.currentIssues Current highlightStory
+                    , displayIssues Nothing (\_ -> True) model.currentIssues Current Current ""
                     ]
                 , Html.section []
                     [ Html.h3 [] [ text "🎉 Done ", Html.small [] [ text "(closed issues)" ] ]
@@ -1069,29 +1154,29 @@ viewPage user model route =
                         |> (\s -> [s])
                         |> Html.strong []
                         |> Just
-                    ) (\_ -> True ) model.closedIssues Done highlightStory
-                    , displayIssuesWithinMilestones model.milestones IssueClosed highlightStory
+                    ) (\_ -> True ) model.closedIssues Done Done ""
+                    , displayIssuesWithinMilestones model.milestones IssueClosed
                     ]
                 ]
     in
         case route of
             Nothing ->
-                issuesIndex ""
+                issuesIndex
 
             Just r ->
                 case r of
                     Story user repo id ->
-                        issuesIndex id
+                        issuesIndex
 
                     IssuesIndex user repo ->
-                        issuesIndex ""
+                        issuesIndex
 
                     MilestonesIndex user repo ->
                         milestonesIndex
 
 
-listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> String -> String -> Html Msg
-listIssuesWithinMilestones milestones issueState now lockedIssueNumber highlightStory =
+listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Model -> Html Msg
+listIssuesWithinMilestones milestones issueState now model =
     milestones
         |> Dict.values
         |> List.sortBy
@@ -1125,16 +1210,18 @@ listIssuesWithinMilestones milestones issueState now lockedIssueNumber highlight
                                             head
                                             (List.filter (hasNoLabel "Status: In Progress") issues)
                                             Backlog
-                                            lockedIssueNumber
-                                            highlightStory
+                                            model
+                                            Backlog
+                                            expandedMilestone.milestone.number
 
                                     IssueClosed ->
                                         listIssues
                                             head
                                             issues
                                             Done
-                                            lockedIssueNumber
-                                            highlightStory
+                                            model
+                                            Done
+                                            expandedMilestone.milestone.number
 
                             Nothing ->
                                 span [ cellStyle "400px" ] [ text "Loading" ]
@@ -1162,28 +1249,33 @@ listIssuesWithinMilestones milestones issueState now lockedIssueNumber highlight
                                     text " (no due date)"
                             ]
                 in
-                    if hasIssues then
+                    if hasIssues || True then
                         issues heading
                     else
                         text ""
             )
         |> div []
 
+buttonStyle : List (String, String)
+buttonStyle =
+    [ ( "margin-right", "15px" )
+    , ( "margin-top", "9px" )
+    , ( "border", "0px" )
+    , ( "background", "#eee" )
+    , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
+    , ( "border-radius", "1px" )
+    , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
+    ]
 
-listIssues : Maybe (Html Msg) -> List Issue -> Column -> String -> String -> Html Msg
-listIssues head issues col lockedIssueNumber highlightStory =
+listIssues : Maybe (Html Msg) -> List Issue -> Column -> Model -> Column -> String -> Html Msg
+listIssues head issues col model addto milestoneNumber =
     let
+        lockedIssueNumber =
+            model.lockedIssueNumber
+
         button issue title =
             Html.button
-                [ style
-                    [ ( "margin-right", "15px" )
-                    , ( "margin-top", "9px" )
-                    , ( "border", "0px" )
-                    , ( "background", "#eee" )
-                    , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
-                    , ( "border-radius", "1px" )
-                    , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
-                    ]
+                [ style buttonStyle
                 , onClick (IssueAction issue title)
                 ]
                 [ text title ]
@@ -1219,10 +1311,17 @@ listIssues head issues col lockedIssueNumber highlightStory =
                 |> Maybe.withDefault "grey"
 
         getStoryClass issue =
-            if issue.number == highlightStory then
+            if issue.number == model.highlightStory then
                 Attrs.class "story selected"
             else
                 Attrs.class "story not-selected"
+
+        milestone =
+            case List.head issues of
+                Just issue ->
+                    issue.milestone
+                Nothing ->
+                    Nothing
     in
         if List.isEmpty issues then
             text ""
@@ -1261,7 +1360,7 @@ listIssues head issues col lockedIssueNumber highlightStory =
                                                         []
                                                 )
                                     )
-                                , if issue.number == highlightStory then
+                                , if issue.number == model.highlightStory then
                                     Html.p [] [ Markdown.toHtml [] issue.description ]
                                   else
                                     text ""
@@ -1291,6 +1390,24 @@ listIssues head issues col lockedIssueNumber highlightStory =
                                 ]
                             ]
                     )
+                |> (\list ->
+                    case col of
+                        Done ->
+                            list
+                        _ ->
+                            (
+                            if model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
+                                Html.form [ cellStyle "400px", Html.Events.onSubmit <| CreateStory col milestone ]
+                                [ Html.input [ style [ ( "width", "90%" )], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
+                                , Html.button [ style buttonStyle, onClick <| CreateStory col milestone ] [ text "Add" ]
+                                , Html.span [ style [ ("cursor", "pointer" )], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
+                                ]
+                                else
+                                    Html.span [ cellStyle "400px" ]
+                                    [ Html.span [style [ ("cursor", "pointer" )], onClick <| ShowIssueCreationForm addto milestoneNumber ] [ text "add a story" ]
+                                    ]
+                            ) :: list
+                   )
                 |> (\list ->
                         case head of
                             Just htmlNode ->
