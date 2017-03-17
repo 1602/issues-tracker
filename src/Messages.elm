@@ -20,7 +20,7 @@ type Msg
     | MilestoneSet Milestone (Result Error Issue)
     | MilestoneCreated (Result Error Milestone)
     | IssueStarted (Maybe Milestone) (Result Error Issue)
-    | IssueRestarted Milestone (Result Error Issue)
+    | IssueRestarted (Maybe Milestone) (Result Error Issue)
     | IssueFinished (Maybe Milestone) (Result Error Issue)
     | LoadUser (Result Error User)
     | IssueAction Issue String
