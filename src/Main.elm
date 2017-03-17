@@ -1408,7 +1408,10 @@ listIssues head issues col model addto milestoneNumber =
 
                                     Icebox ->
                                         [ button issue "plan"
-                                        , button issue "start"
+                                        , if hasLabel "Status: Ready" issue then
+                                            button issue "start"
+                                        else
+                                            text ""
                                         , button issue <|
                                             (if hasLabel "Status: Ready" issue then
                                                 "put on ice"
