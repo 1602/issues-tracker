@@ -1,6 +1,7 @@
 module Decoders exposing (..)
 
 import Json.Decode as Decode exposing (field, nullable, maybe)
+import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional)
 import Date
 import Models exposing (..)
 
@@ -63,13 +64,14 @@ userDecoder =
 
 milestoneDecoder : Decode.Decoder Milestone
 milestoneDecoder =
-    Decode.map8 Milestone
-        (field "id" decodeIntToString)
-        (field "number" decodeIntToString)
-        (field "state" Decode.string)
-        (field "title" Decode.string)
-        (maybe <| field "description" Decode.string)
+    decode Milestone
+        |> required "id" decodeIntToString
+        |> required "number" decodeIntToString
+        |> required "state" Decode.string
+        |> required "title" Decode.string
+        |> required "description" (nullable Decode.string)
         -- (field "creator" userDecoder)
-        (field "open_issues" Decode.int)
-        (field "closed_issues" Decode.int)
-        (maybe <| field "due_on" decodeStringToDate)
+        |> required "open_issues" Decode.int
+        |> required "closed_issues" Decode.int
+        |> required "due_on" (nullable decodeStringToDate)
+        |> required "html_url" Decode.string

@@ -55,6 +55,7 @@ type alias Milestone =
     , openIssues : Int
     , closedIssues : Int
     , dueOn : Maybe Date.Date
+    , htmlUrl : String
     }
 
 type alias ExpandedMilestone =
