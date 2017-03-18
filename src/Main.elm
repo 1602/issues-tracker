@@ -266,7 +266,8 @@ update msg model =
             case model.accessToken of
                 Just token ->
                     { model | newIssueTitle = "" }
-                        ! [ createIssue model.repo
+                        ! (if model.newIssueTitle /= "" then
+                            [ createIssue model.repo
                                 token
                                 ([ ( "title", Encode.string model.newIssueTitle )
                                  , ( "body", Encode.string "" )
@@ -308,7 +309,10 @@ update msg model =
                                     |> Encode.object
                                 )
                                 (StoryCreated col milestone)
-                          ]
+                            ]
+                           else
+                            []
+                          )
 
                 Nothing ->
                     model ! []
@@ -1398,7 +1402,16 @@ listIssues head issues col model addto milestoneNumber =
                                             )
                                 )
                             , if issue.number == model.highlightStory then
-                                Html.p [] [ Markdown.toHtml [] issue.description ]
+                                div []
+                                    [ Html.p [] [ Markdown.toHtml [] issue.description ]
+                                    , Html.p []
+                                        [ text "created by "
+                                        , text issue.creator.login
+                                        , text " "
+                                        , text <| Distance.inWords model.now issue.createdAt
+                                        , text " ago"
+                                        ]
+                                    ]
                               else
                                 text ""
                             , div [ Attrs.class "buttons" ] <|
@@ -1410,7 +1423,7 @@ listIssues head issues col model addto milestoneNumber =
                                         [ button issue "plan"
                                         , if hasLabel "Status: Ready" issue then
                                             button issue "start"
-                                        else
+                                          else
                                             text ""
                                         , button issue <|
                                             (if hasLabel "Status: Ready" issue then
@@ -1551,6 +1564,13 @@ viewTopbar user location =
                     , ( "display", "inline-block" )
                     ]
                 ]
+        , text "Show stories: "
+        , Html.select []
+            [ Html.option [] [ text "all" ]
+            , Html.option [] [ text "assigned to me" ]
+            , Html.option [] [ text "created by me" ]
+            , Html.option [] [ text "mentioning me" ]
+            ]
         ]
 
 

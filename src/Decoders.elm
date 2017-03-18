@@ -37,16 +37,18 @@ decodeIntToString =
 
 issueDecoder : Decode.Decoder Issue
 issueDecoder =
-    Decode.map8 Issue
+    decode Issue
         -- (field "id" decodeIntToString)
-        (field "number" decodeIntToString)
-        (field "state" Decode.string)
-        (field "title" Decode.string)
-        (field "body" Decode.string)
-        (field "assignees" <| Decode.list userDecoder)
-        (maybe <| field "milestone" milestoneDecoder)
-        (field "html_url" Decode.string)
-        (field "labels" <| Decode.list labelDecoder)
+        |> required "number" decodeIntToString
+        |> required "state" Decode.string
+        |> required "title" Decode.string
+        |> required "body" Decode.string
+        |> required "user" userDecoder
+        |> required "assignees" (Decode.list userDecoder)
+        |> required "milestone" (nullable milestoneDecoder)
+        |> required "html_url" Decode.string
+        |> required "labels" (Decode.list labelDecoder)
+        |> required "created_at" decodeStringToDate
 
 labelDecoder : Decode.Decoder Label
 labelDecoder =

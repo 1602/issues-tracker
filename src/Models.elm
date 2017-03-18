@@ -33,10 +33,12 @@ type alias Issue =
     , state : String
     , title : String
     , description : String
+    , creator : User
     , assignees : List User
     , milestone : Maybe Milestone
     , htmlUrl : String
     , labels : List Label
+    , createdAt : Date.Date
     }
 
 type alias Label =
