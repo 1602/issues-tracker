@@ -21,6 +21,11 @@ type alias PersistedData =
     { accessToken : Maybe String
     }
 
+type Filter
+    = All
+    | CreatedBy String
+    | AssignedTo String
+    | HasMentionOf String
 
 type alias User =
     { login : String

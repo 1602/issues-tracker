@@ -84,6 +84,7 @@ type alias Model =
     , needFocus : Bool
     , addIssueToColumn : Column
     , addIssueToMilestone : String
+    , filter : Filter
     }
 
 
@@ -123,6 +124,7 @@ init persistentData location =
                 -- needs focus
                 Done
                 ""
+                All
 
         -- needFocus
     in
@@ -175,13 +177,18 @@ aboutToLoadResource loc model =
                 { model | highlightStory = "" }
 
 
-loadAllIssues : String -> String -> List (Cmd Msg)
-loadAllIssues repo accessToken =
-    [ fetchIssues repo accessToken Current
-    , fetchIssues repo accessToken Icebox
-    , fetchIssues repo accessToken Done
-    , fetchMilestones repo accessToken
-    ]
+loadAllIssues : Model -> List (Cmd Msg)
+loadAllIssues model =
+    case model.accessToken of
+        Just accessToken ->
+            [ fetchIssues model.filter model.repo accessToken Current
+            , fetchIssues model.filter model.repo accessToken Icebox
+            , fetchIssues model.filter model.repo accessToken Done
+            , fetchMilestones model.repo accessToken
+            ]
+
+        Nothing ->
+            []
 
 
 loadResource : Model -> List (Cmd Msg)
@@ -190,23 +197,19 @@ loadResource model =
         Nothing ->
             case model.user of
                 Just user ->
-                    case model.accessToken of
-                        Just token ->
-                            case parseHash model.location of
-                                Just (Story user repo id) ->
-                                    loadAllIssues model.repo token
+                    case parseHash model.location of
+                        Just (Story user repo id) ->
+                            loadAllIssues model
 
-                                Just (IssuesIndex user repo) ->
-                                    loadAllIssues model.repo token
+                        Just (IssuesIndex user repo) ->
+                            loadAllIssues model
 
-                                Just (MilestonesIndex user repo) ->
-                                    loadAllIssues model.repo token
-
-                                Nothing ->
-                                    loadAllIssues model.repo token
+                        Just (MilestonesIndex user repo) ->
+                            loadAllIssues model
 
                         Nothing ->
-                            []
+                            loadAllIssues model
+
 
                 Nothing ->
                     []
@@ -255,6 +258,31 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        ChangeFilter s ->
+            case model.user of
+                Just u ->
+                    let
+                        updatedModel =
+                            { model | filter = (
+                                case s of
+                                    "assigned to me" ->
+                                        AssignedTo u.login
+
+                                    "created by me" ->
+                                        CreatedBy u.login
+
+                                    "mentioning me" ->
+                                        HasMentionOf u.login
+
+                                    _ ->
+                                        All
+                            ) }
+                    in
+                       updatedModel ! loadAllIssues updatedModel
+
+                Nothing ->
+                    model ! []
 
         ShowIssueCreationForm col msn ->
             { model | addIssueToColumn = col, addIssueToMilestone = msn } ! []
@@ -330,20 +358,20 @@ update msg model =
                                         Backlog ->
                                             case milestone of
                                                 Just ms ->
-                                                    fetchMilestoneIssues model.repo token IssueOpen ms
+                                                    fetchMilestoneIssues model.filter model.repo token IssueOpen ms
 
                                                 Nothing ->
-                                                    fetchIssues model.repo token Icebox
+                                                    fetchIssues model.filter model.repo token Icebox
 
                                         _ ->
-                                            fetchIssues model.repo token col
+                                            fetchIssues model.filter model.repo token col
                                   ]
 
                         Nothing ->
                             model ! []
 
         UrgentIssueAdded result ->
-            model ! [ fetchIssues model.repo (Maybe.withDefault "" model.accessToken) Icebox ]
+            model ! [ fetchIssues model.filter model.repo (Maybe.withDefault "" model.accessToken) Icebox ]
 
         StoryFocused ->
             { model | needFocus = False } ! []
@@ -385,14 +413,8 @@ update msg model =
             { model | now = now } ! []
 
         CurrentTime now ->
-            { model | now = Date.fromTime now }
-                ! (case model.accessToken of
-                    Just token ->
-                        loadAllIssues model.repo token
+            { model | now = Date.fromTime now } ! loadAllIssues model
 
-                    Nothing ->
-                        []
-                  )
 
         SelectStory issue ->
             case parseHash model.location of
@@ -578,11 +600,11 @@ update msg model =
                             Just token ->
                                 (milestones
                                     |> List.filter (\ms -> ms.openIssues > 0)
-                                    |> List.map (fetchMilestoneIssues model.repo token IssueOpen)
+                                    |> List.map (fetchMilestoneIssues model.filter model.repo token IssueOpen)
                                 )
                                     ++ (milestones
                                             |> List.filter (\ms -> ms.closedIssues > 0)
-                                            |> List.map (fetchMilestoneIssues model.repo token IssueClosed)
+                                            |> List.map (fetchMilestoneIssues model.filter model.repo token IssueClosed)
                                        )
 
                             Nothing ->
@@ -640,8 +662,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model.repo token IssueOpen m
-                        , fetchIssues model.repo token Icebox
+                        [ fetchMilestoneIssues model.filter model.repo token IssueOpen m
+                        , fetchIssues model.filter model.repo token Icebox
                         ]
 
                     Nothing ->
@@ -678,8 +700,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model.repo token IssueOpen m
-                        , fetchIssues model.repo token Icebox
+                        [ fetchMilestoneIssues model.filter model.repo token IssueOpen m
+                        , fetchIssues model.filter model.repo token Icebox
                         ]
 
                     Nothing ->
@@ -692,13 +714,13 @@ update msg model =
                     Just token ->
                         case m of
                             Just milestone ->
-                                [ fetchMilestoneIssues model.repo token IssueClosed milestone
-                                , fetchIssues model.repo token Current
+                                [ fetchMilestoneIssues model.filter model.repo token IssueClosed milestone
+                                , fetchIssues model.filter model.repo token Current
                                 ]
 
                             Nothing ->
-                                [ fetchIssues model.repo token Done
-                                , fetchIssues model.repo token Current
+                                [ fetchIssues model.filter model.repo token Done
+                                , fetchIssues model.filter model.repo token Current
                                 ]
 
                     Nothing ->
@@ -711,13 +733,13 @@ update msg model =
                     Just token ->
                         case milestone of
                             Just m ->
-                                [ fetchMilestoneIssues model.repo token IssueOpen m
-                                , fetchIssues model.repo token Current
+                                [ fetchMilestoneIssues model.filter model.repo token IssueOpen m
+                                , fetchIssues model.filter model.repo token Current
                                 ]
 
                             Nothing ->
-                                [ fetchIssues model.repo token Current
-                                , fetchIssues model.repo token Icebox
+                                [ fetchIssues model.filter model.repo token Current
+                                , fetchIssues model.filter model.repo token Icebox
                                 ]
 
                     Nothing ->
@@ -730,13 +752,13 @@ update msg model =
                     Just token ->
                         case m of
                             Just m ->
-                                [ fetchMilestoneIssues model.repo token IssueClosed m
-                                , fetchIssues model.repo token Current
+                                [ fetchMilestoneIssues model.filter model.repo token IssueClosed m
+                                , fetchIssues model.filter model.repo token Current
                                 ]
 
                             Nothing ->
-                                [ fetchIssues model.repo token Current
-                                , fetchIssues model.repo token Done
+                                [ fetchIssues model.filter model.repo token Current
+                                , fetchIssues model.filter model.repo token Done
                                 ]
 
                     Nothing ->
@@ -946,7 +968,7 @@ view model =
         case model.user of
             Just user ->
                 div []
-                    [ viewTopbar user model.location
+                    [ viewTopbar user model.location model
                     , viewPage user model <| parseHash model.location
                     , error
                     , case model.pickMilestoneForIssue of
@@ -1541,8 +1563,8 @@ textareaStyle =
         ]
 
 
-viewTopbar : User -> Location -> Html msg
-viewTopbar user location =
+viewTopbar : User -> Location -> Model -> Html Msg
+viewTopbar user location model =
     div []
         [ div
             [ style
@@ -1565,7 +1587,20 @@ viewTopbar user location =
                     ]
                 ]
         , text "Show stories: "
-        , Html.select []
+        , Html.select [ onInput ChangeFilter, Attrs.value (
+            case model.filter of
+                AssignedTo _ ->
+                    "assigned to me"
+
+                CreatedBy _ ->
+                    "created by me"
+
+                HasMentionOf _ ->
+                    "mentioning me"
+
+                All ->
+                    "all"
+            ) ]
             [ Html.option [] [ text "all" ]
             , Html.option [] [ text "assigned to me" ]
             , Html.option [] [ text "created by me" ]

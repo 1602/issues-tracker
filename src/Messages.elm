@@ -37,4 +37,5 @@ type Msg
     | StoryCreated Column (Maybe Milestone) (Result Error Issue)
     | EditNewStoryTitle String
     | ShowIssueCreationForm Column String
+    | ChangeFilter String
 

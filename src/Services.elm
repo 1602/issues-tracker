@@ -109,8 +109,8 @@ createIssue repo accessToken data onComplete =
             |> Http.send onComplete
 
 
-fetchMilestoneIssues : String -> String -> IssueState -> Milestone -> Cmd Msg
-fetchMilestoneIssues repo accessToken issueState ms =
+fetchMilestoneIssues : Filter -> String -> String -> IssueState -> Milestone -> Cmd Msg
+fetchMilestoneIssues filter repo accessToken issueState ms =
     let
         state =
             case issueState of
@@ -119,6 +119,20 @@ fetchMilestoneIssues repo accessToken issueState ms =
 
                 IssueClosed ->
                     "&state=closed"
+
+        filterByUser =
+            case filter of
+                CreatedBy user ->
+                    "&creator=" ++ user
+
+                AssignedTo user ->
+                    "&assignee=" ++ user
+
+                HasMentionOf user ->
+                    "&mentioned=" ++ user
+
+                All ->
+                    ""
     in
         Http.request
             { method = "GET"
@@ -130,6 +144,7 @@ fetchMilestoneIssues repo accessToken issueState ms =
                     ++ accessToken
                     ++ state
                     ++ "&milestone=" ++ ms.number
+                    ++ filterByUser
             , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
             , body = Http.emptyBody
             , timeout = Nothing
@@ -137,8 +152,8 @@ fetchMilestoneIssues repo accessToken issueState ms =
             }
                 |> Http.send (MilestoneIssuesLoaded ms.number issueState)
 
-fetchIssues : String -> String -> Column -> Cmd Msg
-fetchIssues repo accessToken column =
+fetchIssues : Filter -> String -> String -> Column -> Cmd Msg
+fetchIssues filter repo accessToken column =
     let
         milestone =
             case column of
@@ -172,6 +187,20 @@ fetchIssues repo accessToken column =
 
                 _ ->
                     ""
+
+        filterByUser =
+            case filter of
+                CreatedBy user ->
+                    "&creator=" ++ user
+
+                AssignedTo user ->
+                    "&assignee=" ++ user
+
+                HasMentionOf user ->
+                    "&mentioned=" ++ user
+
+                All ->
+                    ""
     in
         Http.request
             { method = "GET"
@@ -184,6 +213,7 @@ fetchIssues repo accessToken column =
                     ++ labels
                     ++ state
                     ++ milestone
+                    ++ filterByUser
             , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
             , body = Http.emptyBody
             , timeout = Nothing
