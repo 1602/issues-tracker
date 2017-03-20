@@ -1230,14 +1230,21 @@ viewPage user model route =
                             ("🎉 Done", "(closed issues)")
             in
                 if List.member col model.showColumns then
-                    Html.section []
+                    Html.section [ style [ ( "width", case List.length model.showColumns of
+                        3 -> "33.33%"
+                        2 -> "50%"
+                        1 -> "100%"
+                        _ -> "25%" )
+                       , ("padding-right", "4px")
+                       , ("padding-left", "2px")
+                       ] ]
                         [ Html.h3 [ style [ ( "position", "relative" ) ] ]
                             [ text <| title ++ " "
                             , Html.small [] [ text comment ]
                             , span
                                 [ style
                                     [ ( "position", "absolute" )
-                                    , ( "right", "4px" )
+                                    , ( "right", "0px" )
                                     , ( "top", "10px" )
                                     , ( "width", "20px" )
                                     , ( "height", "20px" )
@@ -1259,6 +1266,7 @@ viewPage user model route =
                 [ style
                     [ ( "display", "flex" )
                     , ( "width", "100%" )
+                    , ( "height", "calc(100vh - 34px)" )
                     ]
                 ]
                 [ column Icebox
@@ -1513,7 +1521,7 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                                 ( "filter", "none" )
                             ]
                         ]
-                        [ span [ cellStyle "400px" ]
+                        [ span [ cellStyle "calc(100% - 4px)" ]
                             [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
@@ -1608,14 +1616,14 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                 [div [ style
                     [ ( "background", "#111" )
                     , ( "padding", "2px" )
-                    , ( "width", "408px" )
+                    -- , ( "width", "408px" )
                     , ( "margin-top", "4px" )
                     , ( "margin-right", "4px" )
                     ] ]
                 (
                     [ Html.strong []
                         [ Html.span [ cellExStyle
-                            [ ( "width", "400px" )
+                            [ ( "width", "calc(100% - 4px)" )
                             , ( "background", "#111" )
                             , ( "padding", "2px" )
                             ]
@@ -1693,7 +1701,7 @@ cellExStyle list =
         ([ ( "padding", "10px" )
          , ( "margin", "2px" )
          , ( "vertical-align", "top" )
-         , ( "width", "400px" )
+         , ( "width", "calc(100% - 4px)" )
            -- , ( "font-family", "monospace" )
          , ( "overflow", "hidden" )
          , ( "text-overflow", "ellipsis" )

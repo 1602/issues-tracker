@@ -77,17 +77,24 @@ h3 > small {
 
 h1 { font-size : 23px; font-weight: 700; }
 h2 { font-size : 19px; font-weight: 500; }
+main > section {
+    height: 100%;
+    overflow-y: auto;
+}
+
 section > h3 {
     background: #111;
     padding: 5px;
+    margin-top: 0px;
+    overflow: hidden;
     margin-bottom: 2px;
     margin-right: 4px;
     padding-left: 10px;
     line-height: 30px;
-    min-width: 400px;
     box-sizing: border-box;
+    white-space: nowrap;
 }
-body { margin-top: 0; background: #222; color: #eee; font-family: Fira Code, Iosevka, PragmataPro, menlo, monospace; font-size: 12px }
+body { margin: 0; background: #222; color: #eee; font-family: Fira Code, Iosevka, PragmataPro, menlo, monospace; font-size: 12px }
 a:link, a:visited { color: lightblue; text-decoration: none; }
 form { margin: 0 }
 ul { margin: 0; padding: 0} 
