@@ -49,6 +49,7 @@ issueDecoder =
         |> required "html_url" Decode.string
         |> required "labels" (Decode.list labelDecoder)
         |> required "created_at" decodeStringToDate
+        |> required "updated_at" decodeStringToDate
 
 labelDecoder : Decode.Decoder Label
 labelDecoder =

@@ -44,6 +44,7 @@ type alias Issue =
     , htmlUrl : String
     , labels : List Label
     , createdAt : Date.Date
+    , updatedAt : Date.Date
     }
 
 type alias Label =

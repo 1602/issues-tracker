@@ -143,6 +143,7 @@ fetchMilestoneIssues filter repo accessToken issueState ms =
                     ++ "/issues?access_token="
                     ++ accessToken
                     ++ state
+                    ++ "&sort=updated"
                     ++ "&milestone=" ++ ms.number
                     ++ filterByUser
             , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
@@ -210,6 +211,7 @@ fetchIssues filter repo accessToken column =
                     ++ repo
                     ++ "/issues?access_token="
                     ++ accessToken
+                    ++ "&sort=updated"
                     ++ labels
                     ++ state
                     ++ milestone
