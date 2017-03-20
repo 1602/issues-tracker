@@ -1549,11 +1549,7 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                                     , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
                                     ]
                              else
-                                Html.span
-                                    [ cellExStyle [ ( "text-align", "center" ), ( "background", "#111" ), ( "cursor", "pointer" ), ( "font-weight", "700" ) ]
-                                    , onClick <| ShowIssueCreationForm addto milestoneNumber
-                                    ]
-                                    [ text "add another story" ]
+                                 text ""
                             )
                                 :: list
                 else
@@ -1574,7 +1570,40 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                             , ( "background", "#111" )
                             , ( "padding", "2px" )
                             ]
-                            ] [ text <| (Maybe.withDefault "" icon) ++ " " ++ head ]
+                            ]
+                            [ text <| (Maybe.withDefault "" icon) ++ " " ++ head
+                            , if col == Done || not allowAdd || model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
+                                if allowAdd && col /= Done then
+                                    span
+                                        [ style
+                                            [ ( "position", "absolute" )
+                                            , ( "right", "0px" )
+                                            , ( "width", "20px" )
+                                            , ( "height", "20px" )
+                                            , ( "background", "#111" )
+                                            , ( "line-height", "20px" )
+                                            , ( "text-align", "center" )
+                                            , ( "cursor", "pointer" )
+                                            ]
+                                        , onClick <| ShowIssueCreationForm Done ""
+                                        ] [ text " - " ]
+                                else
+                                    text ""
+                            else
+                                span
+                                    [ style
+                                        [ ( "position", "absolute" )
+                                        , ( "right", "0px" )
+                                        , ( "width", "20px" )
+                                        , ( "height", "20px" )
+                                        , ( "background", "#111" )
+                                        , ( "line-height", "20px" )
+                                        , ( "text-align", "center" )
+                                        , ( "cursor", "pointer" )
+                                        ]
+                                    , onClick <| ShowIssueCreationForm addto milestoneNumber
+                                    ] [ text " + " ]
+                            ]
                         ]
                     ] ++ list
                     )
