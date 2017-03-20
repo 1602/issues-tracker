@@ -1560,11 +1560,17 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                     list
                )
             |> (\list ->
-                [div [ style [ ("border", "1px solid red") ] ]
+                [div [ style
+                    [ ( "background", "#111" )
+                    , ( "padding", "2px" )
+                    , ( "width", "408px" )
+                    , ( "margin-top", "4px" )
+                    , ( "margin-right", "4px" )
+                    ] ]
                 (
                     [ Html.strong []
                         [ Html.span [ cellExStyle
-                            [ ( "width", "408px" )
+                            [ ( "width", "400px" )
                             , ( "background", "#111" )
                             , ( "padding", "2px" )
                             ]
