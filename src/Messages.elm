@@ -38,4 +38,5 @@ type Msg
     | EditNewStoryTitle String
     | ShowIssueCreationForm Column String
     | ChangeFilter String
+    | HideColumn Column
 

@@ -86,6 +86,7 @@ type alias Model =
     , addIssueToColumn : Column
     , addIssueToMilestone : String
     , filter : Filter
+    , showColumns : List Column
     }
 
 
@@ -126,6 +127,7 @@ init persistentData location =
                 Done
                 ""
                 All
+                [ Icebox, Backlog, Current, Done ]
 
         -- needFocus
     in
@@ -259,6 +261,9 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        HideColumn s ->
+            { model | showColumns = List.filter (\a -> a /= s) model.showColumns } ! []
 
         ChangeFilter s ->
             case model.user of
@@ -1079,12 +1084,12 @@ viewPage user model route =
                             List.length mss
                     in
                         if total == loaded then
-                            listIssuesWithinMilestones milestones issueState model.now model
+                            Just <| listIssuesWithinMilestones milestones issueState model.now model
                         else
-                            span [ cellStyle "400px" ] [ text <| "Loading milestones (" ++ (toString loaded) ++ " of " ++ (toString total) ++ ")..." ]
+                            Just <| span [ cellStyle "400px" ] [ text <| "Loading milestones (" ++ (toString loaded) ++ " of " ++ (toString total) ++ ")..." ]
 
                 Nothing ->
-                    span [ cellStyle "400px" ] [ text "Loading milestones..." ]
+                    Nothing
 
         displayIssues head filter issues col addto milestoneNumber =
             case issues of
@@ -1208,6 +1213,47 @@ viewPage user model route =
                 Nothing ->
                     text "Loading..."
 
+        column col content =
+            let
+                (title, comment) =
+                    case col of
+                        Icebox ->
+                            ("❄ Icebox", "(keep this place empty)")
+
+                        Backlog ->
+                            ("🚥 Backlog", "(plan all the things via milestones)")
+
+                        Current ->
+                            ("🐝 In progress", "(issues with status 'In Progress')")
+
+                        Done ->
+                            ("🎉 Done", "(closed issues)")
+            in
+                if List.member col model.showColumns then
+                    Html.section []
+                        [ Html.h3 [ style [ ( "position", "relative" ) ] ]
+                            [ text <| title ++ " "
+                            , Html.small [] [ text comment ]
+                            , span
+                                [ style
+                                    [ ( "position", "absolute" )
+                                    , ( "right", "4px" )
+                                    , ( "top", "10px" )
+                                    , ( "width", "20px" )
+                                    , ( "height", "20px" )
+                                    , ( "background", "#111" )
+                                    , ( "line-height", "20px" )
+                                    , ( "text-align", "center" )
+                                    , ( "cursor", "pointer" )
+                                    ]
+                                , onClick <| HideColumn col
+                                ] [ text "×" ]
+                            ]
+                        , Maybe.withDefault (span [ cellStyle "400px" ] [ text "Loading..." ]) content
+                        ]
+                else
+                    text ""
+
         issuesIndex =
             Html.main_
                 [ style
@@ -1215,23 +1261,20 @@ viewPage user model route =
                     , ( "width", "100%" )
                     ]
                 ]
-                [ Html.section []
-                    [ Html.h3 [] [ text "❄ Icebox ", Html.small [] [ text "(keep this place empty)" ] ]
-                    , case model.iceboxIssues of
-                       Just issues ->
-                           div [] <|
-                           displayIssuesGroupedByDate 
-                               (List.filter (hasNoLabel "Status: Ready") issues)
-                               Icebox
-
-                       Nothing ->
-                           text "Loading..."
-                    ]
-                , Html.section []
-                    [ Html.h3 [] [ text "🚥 Backlog ", Html.small [] [ text "(plan all the things via milestones)" ] ]
-                    , 
-                    case model.iceboxIssues of
-                        Just issues ->
+                [ column Icebox
+                    (
+                        model.iceboxIssues
+                            |> Maybe.andThen (\issues ->
+                                 displayIssuesGroupedByDate 
+                                     (List.filter (hasNoLabel "Status: Ready") issues)
+                                     Icebox
+                                         |> div []
+                                         |> Just
+                                )
+                    )
+                , column Backlog
+                    (model.iceboxIssues
+                        |> Maybe.andThen (\issues ->
                             let
                                 filter which =
                                     (hasLabel "Status: Ready" which) &&
@@ -1244,25 +1287,27 @@ viewPage user model route =
                                     (Just "😞", "Just do it")
                             in
                                 listIssues head True filteredIssues Icebox model Backlog ""
-
-                        Nothing ->
-                            span [ cellStyle "400px" ] [ text "Loading..." ]
-
-                    , displayIssuesWithinMilestones model.milestones IssueOpen
-                    ]
-                , Html.section []
-                    [ Html.h3 [] [ text "🐝 In progress ", Html.small [] [ text "(issues with status 'In Progress')" ] ]
-                    , case model.currentIssues of
-                        Just issues ->
-                            div [] <|
-                                displayIssuesGroupedByDate issues Current
-                        Nothing ->
-                            text "Loading current issues"
-                    ]
-                , Html.section []
-                    [ Html.h3 [] [ text "🎉 Done ", Html.small [] [ text "(closed issues)" ] ]
-                    , case model.closedIssues of
-                        Just issues ->
+                                    |> Just
+                        )
+                        |> Maybe.andThen (\htmlNode ->
+                            case displayIssuesWithinMilestones model.milestones IssueOpen of
+                                Just html ->
+                                    div [] [ htmlNode, html ] |> Just
+                                Nothing ->
+                                    Nothing
+                        )
+                    )
+                , column Current
+                        (model.currentIssues
+                            |> Maybe.andThen (\issues ->
+                                 displayIssuesGroupedByDate issues Current
+                                     |> div []
+                                     |> Just
+                            )
+                        )
+                , column Done
+                    (model.closedIssues
+                        |> Maybe.andThen (\issues ->
                             listIssues
                                 (Just "💪", "We just did it")
                                 True
@@ -1271,12 +1316,16 @@ viewPage user model route =
                                 model
                                 Done
                                 ""
-
-                        Nothing ->
-                            span [ cellStyle "400px" ] [ text "Loading..." ]
-
-                    , displayIssuesWithinMilestones model.milestones IssueClosed
-                    ]
+                                    |> Just
+                            )
+                        |> Maybe.andThen (\htmlNode ->
+                            case displayIssuesWithinMilestones model.milestones IssueClosed of
+                                Just html ->
+                                    div [] [ htmlNode, html ] |> Just
+                                Nothing ->
+                                    Nothing
+                            )
+                        )
                 ]
     in
         case route of
