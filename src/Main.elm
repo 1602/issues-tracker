@@ -304,7 +304,7 @@ update msg model =
         EditNewStoryTitle s ->
             { model | newIssueTitle = s } ! []
 
-        CreateStory col milestone ->
+        CreateStory col ->
             case model.accessToken of
                 Just token ->
                     { model | newIssueTitle = "" }
@@ -316,8 +316,13 @@ update msg model =
                                  , ( "labels"
                                    , Encode.list <|
                                         (case col of
-                                            Backlog ->
-                                                [ Encode.string "Status: Ready" ]
+                                            Icebox ->
+                                                case model.addIssueToMilestone of
+                                                    "" ->
+                                                        [ Encode.string "Status: Ready" ]
+
+                                                    _ ->
+                                                        []
 
                                             Current ->
                                                 [ Encode.string "Status: In Progress" ]
@@ -327,12 +332,17 @@ update msg model =
                                         )
                                    )
                                  , ( "milestone"
-                                   , case milestone of
-                                        Just ms ->
-                                            ms.number |> String.toInt |> Result.withDefault 0 |> Encode.int
-
-                                        Nothing ->
+                                   , case model.addIssueToMilestone of
+                                        "" ->
                                             Encode.null
+                                                |> Debug.log "create without milestone"
+                                        _ ->
+                                            model.addIssueToMilestone
+                                                |> Debug.log "create within milestone"
+                                                |> String.toInt
+                                                |> Result.withDefault 0
+                                                |> Encode.int
+
                                    )
                                  , ( "assignees"
                                    , case col of
@@ -350,7 +360,12 @@ update msg model =
                                  ]
                                     |> Encode.object
                                 )
-                                (StoryCreated col milestone)
+                                (StoryCreated col (
+                                    model.milestones
+                                        |> Maybe.withDefault Dict.empty
+                                        |> Dict.get model.addIssueToMilestone
+                                        |> Maybe.andThen (\ms -> Just ms.milestone)
+                                ))
                             ]
                            else
                             []
@@ -1628,7 +1643,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
 
                             _ ->
                                 (if model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
-                                    Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory col milestone ]
+                                    Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory col ]
                                         [ Html.input [ style [ ( "width", "90%" ) ], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
                                         , Html.button [ style buttonStyle ] [ text "Add" ]
                                         , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]

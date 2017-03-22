@@ -33,7 +33,7 @@ type Msg
     | CreateNewMilestone
     | StoryFocused
     | UrgentIssueAdded (Result Error Issue)
-    | CreateStory Column (Maybe Milestone)
+    | CreateStory Column
     | StoryCreated Column (Maybe Milestone) (Result Error Issue)
     | EditNewStoryTitle String
     | ShowIssueCreationForm Column String
