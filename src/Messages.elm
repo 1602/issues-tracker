@@ -39,4 +39,5 @@ type Msg
     | ShowIssueCreationForm Column String
     | ChangeFilter String
     | HideColumn Column
+    | ReopenColumn Column
 

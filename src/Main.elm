@@ -264,6 +264,13 @@ update msg model =
         HideColumn s ->
             { model | showColumns = List.filter (\a -> a /= s) model.showColumns } ! []
 
+        ReopenColumn s ->
+            { model | showColumns =
+                model.showColumns
+                    |> List.filter (\a -> a /= s)
+                    |> (::) s
+            } ! []
+
         ChangeFilter s ->
             case model.user of
                 Just u ->
@@ -1460,6 +1467,9 @@ buttonStyle =
     , ( "margin-top", "9px" )
     , ( "border", "0px" )
     , ( "background", "#eee" )
+    , ( "color", "#222" )
+    , ( "cursor", "pointer" )
+    -- , ( "line-height", "30px" )
     , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
     , ( "border-radius", "1px" )
     , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
@@ -1801,8 +1811,25 @@ viewTopbar user location model =
             , Html.option [] [ text "created by me" ]
             , Html.option [] [ text "mentioning me" ]
             ]
+        , []
+            |> reopeningColumnButton Done model.showColumns
+            |> reopeningColumnButton Current model.showColumns
+            |> reopeningColumnButton Backlog model.showColumns
+            |> reopeningColumnButton Icebox model.showColumns
+            |> (\list ->
+                 if List.isEmpty list then
+                     text ""
+                 else
+                     span [] <| (text " Reopen column: ") :: list
+                 )
         ]
 
+reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
+reopeningColumnButton col showColumns list =
+    if List.member col showColumns then
+        list
+    else
+        (Html.button [ style buttonStyle, onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
 
 viewLink : String -> Html msg -> Location -> Html msg
 viewLink src childNode location =
