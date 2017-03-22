@@ -1250,8 +1250,8 @@ viewPage user model route =
                                     _ ->
                                         "25%"
                               )
-                            , ( "padding-right", "4px" )
-                            , ( "padding-left", "2px" )
+                            , ( "padding-right", "0px" )
+                            , ( "padding-left", "3px" )
                             ]
                         ]
                         [ Html.h3 [ style [ ( "position", "relative" ) ] ]
@@ -1273,7 +1273,10 @@ viewPage user model route =
                                 ]
                                 [ text "×" ]
                             ]
-                        , Maybe.withDefault (span [ cellStyle "calc(100% - 8px)" ] [ text "Loading..." ]) content
+                        , div [ style [
+                            ( "overflow-y", "auto" )
+                            , ( "height", "calc(100% - 43px)" )
+                            ]] [ Maybe.withDefault (span [ cellStyle "calc(100% - 8px)" ] [ text "Loading..." ]) content ]
                         ]
                 else
                     text ""
