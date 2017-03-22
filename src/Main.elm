@@ -213,7 +213,6 @@ loadResource model =
                         Nothing ->
                             loadAllIssues model
 
-
                 Nothing ->
                     []
 
@@ -270,22 +269,24 @@ update msg model =
                 Just u ->
                     let
                         updatedModel =
-                            { model | filter = (
-                                case s of
-                                    "assigned to me" ->
-                                        AssignedTo u.login
+                            { model
+                                | filter =
+                                    (case s of
+                                        "assigned to me" ->
+                                            AssignedTo u.login
 
-                                    "created by me" ->
-                                        CreatedBy u.login
+                                        "created by me" ->
+                                            CreatedBy u.login
 
-                                    "mentioning me" ->
-                                        HasMentionOf u.login
+                                        "mentioning me" ->
+                                            HasMentionOf u.login
 
-                                    _ ->
-                                        All
-                            ) }
+                                        _ ->
+                                            All
+                                    )
+                            }
                     in
-                       updatedModel ! loadAllIssues updatedModel
+                        updatedModel ! loadAllIssues updatedModel
 
                 Nothing ->
                     model ! []
@@ -420,7 +421,6 @@ update msg model =
 
         CurrentTime now ->
             { model | now = Date.fromTime now } ! loadAllIssues model
-
 
         SelectStory issue ->
             case parseHash model.location of
@@ -1086,7 +1086,7 @@ viewPage user model route =
                         if total == loaded then
                             Just <| listIssuesWithinMilestones milestones issueState model.now model
                         else
-                            Just <| span [ cellStyle "400px" ] [ text <| "Loading milestones (" ++ (toString loaded) ++ " of " ++ (toString total) ++ ")..." ]
+                            Just <| span [ cellStyle "calc(100% - 8px)" ] [ text <| "Loading milestones (" ++ (toString loaded) ++ " of " ++ (toString total) ++ ")..." ]
 
                 Nothing ->
                     Nothing
@@ -1097,26 +1097,25 @@ viewPage user model route =
                     listIssues head True (List.filter filter issues) col model addto milestoneNumber
 
                 Nothing ->
-                    span [ cellStyle "400px" ] [ text "Loading..." ]
-
+                    span [ cellStyle "calc(100% - 8px)" ] [ text "Loading..." ]
 
         displayIssuesGroupedByDate issues col =
             let
-
                 daysSince date =
                     Date.Extra.diff Date.Extra.Day date model.now
 
                 groups =
                     issues
-                        |> List.foldl (\a res ->
-                            if daysSince a.updatedAt <= 1 then
-                                { res | today = res.today ++ [ a ] }
-                            else if daysSince a.updatedAt <= 2 then
-                                { res | yesterday = res.yesterday ++ [ a ] }
-                            else if daysSince a.updatedAt <= 7 then
-                                { res | week = res.week ++ [ a ] }
-                            else
-                                { res | earlier = res.earlier ++ [ a ] }
+                        |> List.foldl
+                            (\a res ->
+                                if daysSince a.updatedAt <= 1 then
+                                    { res | today = res.today ++ [ a ] }
+                                else if daysSince a.updatedAt <= 2 then
+                                    { res | yesterday = res.yesterday ++ [ a ] }
+                                else if daysSince a.updatedAt <= 7 then
+                                    { res | week = res.week ++ [ a ] }
+                                else
+                                    { res | earlier = res.earlier ++ [ a ] }
                             )
                             { today = []
                             , yesterday = []
@@ -1128,17 +1127,15 @@ viewPage user model route =
                     if List.isEmpty list && not add then
                         result
                     else if List.isEmpty list && add then
-                        result ++ [ listIssues (Nothing, title) add list col model col "" ]
+                        result ++ [ listIssues ( Nothing, title ) add list col model col "" ]
                     else
-                        result ++ [ listIssues (Nothing, title) add list col model col "" ]
-
+                        result ++ [ listIssues ( Nothing, title ) add list col model col "" ]
             in
                 []
                     |> append groups.today "Updated within a day" True
                     |> append groups.yesterday "Updated within two days" False
                     |> append groups.week "Updated within a week" False
                     |> append groups.earlier "Updated more than a week ago" False
-
 
         milestonesIndex =
             case model.milestones of
@@ -1215,29 +1212,41 @@ viewPage user model route =
 
         column col content =
             let
-                (title, comment) =
+                ( title, comment ) =
                     case col of
                         Icebox ->
-                            ("❄ Icebox", "(keep this place empty)")
+                            ( "❄ Icebox", "(keep this place empty)" )
 
                         Backlog ->
-                            ("🚥 Backlog", "(plan all the things via milestones)")
+                            ( "🚥 Backlog", "(plan all the things via milestones)" )
 
                         Current ->
-                            ("🐝 In progress", "(issues with status 'In Progress')")
+                            ( "🐝 In progress", "(issues with status 'In Progress')" )
 
                         Done ->
-                            ("🎉 Done", "(closed issues)")
+                            ( "🎉 Done", "(closed issues)" )
             in
                 if List.member col model.showColumns then
-                    Html.section [ style [ ( "width", case List.length model.showColumns of
-                        3 -> "33.33%"
-                        2 -> "50%"
-                        1 -> "100%"
-                        _ -> "25%" )
-                       , ("padding-right", "4px")
-                       , ("padding-left", "2px")
-                       ] ]
+                    Html.section
+                        [ style
+                            [ ( "width"
+                              , case List.length model.showColumns of
+                                    3 ->
+                                        "33.33%"
+
+                                    2 ->
+                                        "50%"
+
+                                    1 ->
+                                        "100%"
+
+                                    _ ->
+                                        "25%"
+                              )
+                            , ( "padding-right", "4px" )
+                            , ( "padding-left", "2px" )
+                            ]
+                        ]
                         [ Html.h3 [ style [ ( "position", "relative" ) ] ]
                             [ text <| title ++ " "
                             , Html.small [] [ text comment ]
@@ -1254,9 +1263,10 @@ viewPage user model route =
                                     , ( "cursor", "pointer" )
                                     ]
                                 , onClick <| HideColumn col
-                                ] [ text "×" ]
+                                ]
+                                [ text "×" ]
                             ]
-                        , Maybe.withDefault (span [ cellStyle "400px" ] [ text "Loading..." ]) content
+                        , Maybe.withDefault (span [ cellStyle "calc(100% - 8px)" ] [ text "Loading..." ]) content
                         ]
                 else
                     text ""
@@ -1270,70 +1280,77 @@ viewPage user model route =
                     ]
                 ]
                 [ column Icebox
-                    (
-                        model.iceboxIssues
-                            |> Maybe.andThen (\issues ->
-                                 displayIssuesGroupedByDate 
-                                     (List.filter (hasNoLabel "Status: Ready") issues)
-                                     Icebox
-                                         |> div []
-                                         |> Just
-                                )
+                    (model.iceboxIssues
+                        |> Maybe.andThen
+                            (\issues ->
+                                displayIssuesGroupedByDate
+                                    (List.filter (hasNoLabel "Status: Ready") issues)
+                                    Icebox
+                                    |> div []
+                                    |> Just
+                            )
                     )
                 , column Backlog
                     (model.iceboxIssues
-                        |> Maybe.andThen (\issues ->
-                            let
-                                filter which =
-                                    (hasLabel "Status: Ready" which) &&
-                                    (hasNoLabel "Status: In Progress" which)
+                        |> Maybe.andThen
+                            (\issues ->
+                                let
+                                    filter which =
+                                        (hasLabel "Status: Ready" which)
+                                            && (hasNoLabel "Status: In Progress" which)
 
-                                filteredIssues =
-                                    List.filter filter issues
+                                    filteredIssues =
+                                        List.filter filter issues
 
-                                head =
-                                    (Just "😞", "Just do it")
-                            in
-                                listIssues head True filteredIssues Icebox model Backlog ""
-                                    |> Just
-                        )
-                        |> Maybe.andThen (\htmlNode ->
-                            case displayIssuesWithinMilestones model.milestones IssueOpen of
-                                Just html ->
-                                    div [] [ htmlNode, html ] |> Just
-                                Nothing ->
-                                    Nothing
-                        )
+                                    head =
+                                        ( Just "😞", "Just do it" )
+                                in
+                                    listIssues head True filteredIssues Icebox model Backlog ""
+                                        |> Just
+                            )
+                        |> Maybe.andThen
+                            (\htmlNode ->
+                                case displayIssuesWithinMilestones model.milestones IssueOpen of
+                                    Just html ->
+                                        div [] [ htmlNode, html ] |> Just
+
+                                    Nothing ->
+                                        Nothing
+                            )
                     )
                 , column Current
-                        (model.currentIssues
-                            |> Maybe.andThen (\issues ->
-                                 displayIssuesGroupedByDate issues Current
-                                     |> div []
-                                     |> Just
-                            )
-                        )
-                , column Done
-                    (model.closedIssues
-                        |> Maybe.andThen (\issues ->
-                            listIssues
-                                (Just "💪", "We just did it")
-                                True
-                                issues
-                                Done
-                                model
-                                Done
-                                ""
+                    (model.currentIssues
+                        |> Maybe.andThen
+                            (\issues ->
+                                displayIssuesGroupedByDate issues Current
+                                    |> div []
                                     |> Just
                             )
-                        |> Maybe.andThen (\htmlNode ->
-                            case displayIssuesWithinMilestones model.milestones IssueClosed of
-                                Just html ->
-                                    div [] [ htmlNode, html ] |> Just
-                                Nothing ->
-                                    Nothing
+                    )
+                , column Done
+                    (model.closedIssues
+                        |> Maybe.andThen
+                            (\issues ->
+                                listIssues
+                                    ( Just "💪", "We just did it" )
+                                    True
+                                    issues
+                                    Done
+                                    model
+                                    Done
+                                    ""
+                                    |> Just
                             )
-                        )
+                        |> Maybe.andThen
+                            (\htmlNode ->
+                                case displayIssuesWithinMilestones model.milestones IssueClosed of
+                                    Just html ->
+                                        div [] [ htmlNode, html ] |> Just
+
+                                    Nothing ->
+                                        Nothing
+                            )
+                    )
                 ]
     in
         case route of
@@ -1403,7 +1420,7 @@ listIssuesWithinMilestones milestones issueState now model =
                                             expandedMilestone.milestone.number
 
                             Nothing ->
-                                span [ cellStyle "400px" ] [ text "Loading" ]
+                                span [ cellStyle "calc(100% - 8px)" ] [ text "Loading" ]
 
                     issues head =
                         case issueState of
@@ -1415,19 +1432,18 @@ listIssuesWithinMilestones milestones issueState now model =
 
                     heading =
                         ( Just "🏁"
-                                -- , Html.a [ Attrs.target "_blank", Attrs.href expandedMilestone.milestone.htmlUrl ] [ text <| expandedMilestone.milestone.title ++ " " ]
-                            , 
-                            expandedMilestone.milestone.title ++
-                            (case expandedMilestone.milestone.dueOn of
-                                Just date ->
-                                    if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
-                                        " overdue"
-                                    else
-                                        " due in " ++ (Distance.inWords now date)
+                          -- , Html.a [ Attrs.target "_blank", Attrs.href expandedMilestone.milestone.htmlUrl ] [ text <| expandedMilestone.milestone.title ++ " " ]
+                        , expandedMilestone.milestone.title
+                            ++ (case expandedMilestone.milestone.dueOn of
+                                    Just date ->
+                                        if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
+                                            " overdue"
+                                        else
+                                            " due in " ++ (Distance.inWords now date)
 
-                                Nothing ->
-                                    " (no due date)"
-                            )
+                                    Nothing ->
+                                        " (no due date)"
+                               )
                         )
                 in
                     if hasIssues || True then
@@ -1450,8 +1466,8 @@ buttonStyle =
     ]
 
 
-listIssues : (Maybe String, String) -> Bool -> List Issue -> Column -> Model -> Column -> String -> Html Msg
-listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
+listIssues : ( Maybe String, String ) -> Bool -> List Issue -> Column -> Model -> Column -> String -> Html Msg
+listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
     let
         lockedIssueNumber =
             model.lockedIssueNumber
@@ -1558,9 +1574,8 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                                             , text " ago"
                                             ]
                                       else
-                                          text ""
+                                        text ""
                                     ]
-
                               else
                                 text ""
                             , div [ Attrs.class "buttons" ] <|
@@ -1593,44 +1608,63 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                         ]
                 )
             |> (\list ->
-                if allowAdd then
-                    case col of
-                        Done ->
-                            list
+                    if allowAdd then
+                        case col of
+                            Done ->
+                                list
 
-                        _ ->
-                            (if model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
-                                Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory col milestone ]
-                                    [ Html.input [ style [ ( "width", "90%" ) ], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
-                                    , Html.button [ style buttonStyle ] [ text "Add" ]
-                                    , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
-                                    ]
-                             else
-                                 text ""
-                            )
-                                :: list
-                else
-                    list
+                            _ ->
+                                (if model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
+                                    Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory col milestone ]
+                                        [ Html.input [ style [ ( "width", "90%" ) ], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
+                                        , Html.button [ style buttonStyle ] [ text "Add" ]
+                                        , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
+                                        ]
+                                 else
+                                    text ""
+                                )
+                                    :: list
+                    else
+                        list
                )
             |> (\list ->
-                [div [ style
-                    [ ( "background", "#111" )
-                    , ( "padding", "2px" )
-                    -- , ( "width", "408px" )
-                    , ( "margin-top", "4px" )
-                    , ( "margin-right", "4px" )
-                    ] ]
-                (
-                    [ Html.strong []
-                        [ Html.span [ cellExStyle
-                            [ ( "width", "calc(100% - 4px)" )
-                            , ( "background", "#111" )
+                    [ div
+                        [ style
+                            [ ( "background", "#111" )
                             , ( "padding", "2px" )
+                              -- , ( "width", "408px" )
+                            , ( "margin-top", "4px" )
+                            , ( "margin-right", "4px" )
                             ]
-                            ]
-                            [ text <| (Maybe.withDefault "" icon) ++ " " ++ head
-                            , if col == Done || not allowAdd || model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
-                                if allowAdd && col /= Done then
+                        ]
+                        ([ Html.strong []
+                            [ Html.span
+                                [ cellExStyle
+                                    [ ( "width", "calc(100% - 4px)" )
+                                    , ( "background", "#111" )
+                                    , ( "padding", "2px" )
+                                    ]
+                                ]
+                                [ text <| (Maybe.withDefault "" icon) ++ " " ++ head
+                                , if col == Done || not allowAdd || model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
+                                    if allowAdd && col /= Done then
+                                        span
+                                            [ style
+                                                [ ( "position", "absolute" )
+                                                , ( "right", "0px" )
+                                                , ( "width", "20px" )
+                                                , ( "height", "20px" )
+                                                , ( "background", "#111" )
+                                                , ( "line-height", "20px" )
+                                                , ( "text-align", "center" )
+                                                , ( "cursor", "pointer" )
+                                                ]
+                                            , onClick <| ShowIssueCreationForm Done ""
+                                            ]
+                                            [ text " - " ]
+                                    else
+                                        text ""
+                                  else
                                     span
                                         [ style
                                             [ ( "position", "absolute" )
@@ -1642,31 +1676,16 @@ listIssues (icon, head) allowAdd issues col model addto milestoneNumber =
                                             , ( "text-align", "center" )
                                             , ( "cursor", "pointer" )
                                             ]
-                                        , onClick <| ShowIssueCreationForm Done ""
-                                        ] [ text " - " ]
-                                else
-                                    text ""
-                            else
-                                span
-                                    [ style
-                                        [ ( "position", "absolute" )
-                                        , ( "right", "0px" )
-                                        , ( "width", "20px" )
-                                        , ( "height", "20px" )
-                                        , ( "background", "#111" )
-                                        , ( "line-height", "20px" )
-                                        , ( "text-align", "center" )
-                                        , ( "cursor", "pointer" )
+                                        , onClick <| ShowIssueCreationForm addto milestoneNumber
                                         ]
-                                    , onClick <| ShowIssueCreationForm addto milestoneNumber
-                                    ] [ text " + " ]
+                                        [ text " + " ]
+                                ]
                             ]
-                        ]
-                    ] ++ list
-                    )
+                         ]
+                            ++ list
+                        )
                     ]
                )
-
             |> div []
 
 
@@ -1760,20 +1779,23 @@ viewTopbar user location model =
                     ]
                 ]
         , text " Show stories: "
-        , Html.select [ onInput ChangeFilter, Attrs.value (
-            case model.filter of
-                AssignedTo _ ->
-                    "assigned to me"
+        , Html.select
+            [ onInput ChangeFilter
+            , Attrs.value
+                (case model.filter of
+                    AssignedTo _ ->
+                        "assigned to me"
 
-                CreatedBy _ ->
-                    "created by me"
+                    CreatedBy _ ->
+                        "created by me"
 
-                HasMentionOf _ ->
-                    "mentioning me"
+                    HasMentionOf _ ->
+                        "mentioning me"
 
-                All ->
-                    "all"
-            ) ]
+                    All ->
+                        "all"
+                )
+            ]
             [ Html.option [] [ text "all" ]
             , Html.option [] [ text "assigned to me" ]
             , Html.option [] [ text "created by me" ]
