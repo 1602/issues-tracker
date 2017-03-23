@@ -9,8 +9,11 @@ try {
         appData.accessToken = appData.user.secretKey;
         delete appData.user;
     }
+    if (!appData.pinnedMilestones) {
+        appData.pinnedMilestones = [];
+    }
 } catch(e) {
-    appData = { accessToken: null };
+    appData = { accessToken: null, pinnedMilestones: [] };
 }
 
 // inject bundled Elm app into div#main

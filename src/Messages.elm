@@ -40,4 +40,5 @@ type Msg
     | ChangeFilter String
     | HideColumn Column
     | ReopenColumn Column
+    | PinMilestone String
 
