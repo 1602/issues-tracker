@@ -385,7 +385,7 @@ update msg model =
                     model ! []
 
         ShowIssueCreationForm col msn ->
-            { model | addIssueToColumn = col, addIssueToMilestone = msn } ! []
+            { model | addIssueToColumn = col, addIssueToMilestone = msn } ! [ setFocus "create-story" ]
 
         EditNewStoryTitle s ->
             { model | newIssueTitle = s } ! []
@@ -395,14 +395,15 @@ update msg model =
                 Just token ->
                     { model | newIssueTitle = "" }
                         ! (if model.newIssueTitle /= "" then
-                            [ createIssue model.repo
+                            [ setFocus "create-story"
+                            , createIssue model.repo
                                 token
                                 ([ ( "title", Encode.string model.newIssueTitle )
                                  , ( "body", Encode.string "" )
                                  , ( "labels"
                                    , Encode.list <|
                                         (case col of
-                                            Icebox ->
+                                            Backlog ->
                                                 case model.addIssueToMilestone of
                                                     "" ->
                                                         [ Encode.string "Status: Ready" ]
@@ -1745,8 +1746,8 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
 
                             _ ->
                                 (if model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
-                                    Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory col ]
-                                        [ Html.input [ style [ ( "width", "90%" ) ], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
+                                    Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory addto ]
+                                        [ Html.input [ Attrs.id "create-story", style [ ( "width", "90%" ) ], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
                                         , Html.button [ style buttonStyle ] [ text "Add" ]
                                         , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
                                         ]
