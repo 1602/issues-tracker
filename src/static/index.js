@@ -12,8 +12,11 @@ try {
     if (!appData.pinnedMilestones) {
         appData.pinnedMilestones = [];
     }
+    if (!appData.columns) {
+        appData.columns = [ "Icebox", "Backlog", "Current", "Done" ];
+    }
 } catch(e) {
-    appData = { accessToken: null, pinnedMilestones: [] };
+    appData = { accessToken: null, pinnedMilestones: [], columns: [ "Icebox", "Backlog", "Current", "Done" ] };
 }
 
 // inject bundled Elm app into div#main

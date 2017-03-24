@@ -20,6 +20,7 @@ type IssueState = IssueOpen | IssueClosed
 type alias PersistedData =
     { accessToken : Maybe String
     , pinnedMilestones : List (String, String)
+    , columns : List String
     }
 
 type Filter

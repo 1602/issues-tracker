@@ -109,6 +109,24 @@ init persistentData location =
             persistentData.pinnedMilestones
                 |> Dict.fromList
 
+
+        showColumns =
+            persistentData.columns
+                |> List.map (\s ->
+                    case s of
+                        "Current" ->
+                            Current
+
+                        "Done" ->
+                            Done
+
+                        "Icebox" ->
+                            Icebox
+
+                        _ ->
+                            Backlog
+                )
+
         model =
             Model
                 Nothing
@@ -131,7 +149,7 @@ init persistentData location =
                 Done
                 ""
                 All
-                [ Icebox, Backlog, Current, Done ]
+                showColumns
                 pinnedMilestones
 
         -- needFocus
@@ -234,8 +252,16 @@ port saveData : PersistedData -> Cmd msg
 port clipboard : String -> Cmd msg
 
 
+updateLocalStorage : Model -> Cmd msg
+updateLocalStorage model =
+    saveData <| PersistedData
+        model.accessToken
+        (Dict.toList model.pinnedMilestones)
+        (List.map toString model.showColumns)
+
 
 -- UPDATE
+
 
 setFocus : String -> Cmd Msg
 setFocus id =
@@ -293,30 +319,43 @@ update msg model =
                     else
                         s
 
-                pinnedMilestones =
-                    model.pinnedMilestones
-                        |> Dict.insert model.repo n
+                updatedModel =
+                    { model
+                    | pinnedMilestones =
+                        model.pinnedMilestones
+                            |> Dict.insert model.repo n
+                    }
 
-                save =
-                    saveData
-                        <| PersistedData model.accessToken (Dict.toList pinnedMilestones)
             in
-                { model | pinnedMilestones = pinnedMilestones } ! (
+                updatedModel ! (
                     if n /= "" then
-                        [ setFocus <| "milestone-" ++ n, save ]
+                        [ setFocus <| "milestone-" ++ n, updateLocalStorage updatedModel ]
                     else
-                        [ save ]
+                        [ updateLocalStorage updatedModel ]
                 )
 
         HideColumn s ->
-            { model | showColumns = List.filter (\a -> a /= s) model.showColumns } ! []
+            let
+                updatedModel =
+                    { model
+                    | showColumns =
+                        model.showColumns
+                            |> List.filter ((/=) s)
+                    }
+            in
+               updatedModel ! [ updateLocalStorage updatedModel ]
 
         ReopenColumn s ->
-            { model | showColumns =
-                model.showColumns
-                    |> List.filter (\a -> a /= s)
-                    |> (::) s
-            } ! []
+            let
+                updatedModel =
+                    { model
+                    | showColumns =
+                        model.showColumns
+                            |> List.filter ((/=) s)
+                            |> (::) s
+                    }
+            in
+               updatedModel ! [ updateLocalStorage updatedModel ]
 
         ChangeFilter s ->
             case model.user of
@@ -483,7 +522,7 @@ update msg model =
                 if model.token == "" then
                     model ! [ Navigation.load "https://github.com/settings/tokens" ]
                 else
-                    updatedModel ! (fetchUser model.token :: ((saveData <| PersistedData (Just model.token) []) :: (loadResource updatedModel)))
+                    updatedModel ! ([fetchUser model.token, updateLocalStorage updatedModel] ++ (loadResource updatedModel))
 
         CurrentDate now ->
             { model | now = now } ! []
