@@ -41,4 +41,5 @@ type Msg
     | HideColumn Column
     | ReopenColumn Column
     | PinMilestone String
+    | FilterStories String
 

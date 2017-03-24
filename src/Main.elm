@@ -88,6 +88,7 @@ type alias Model =
     , filter : Filter
     , showColumns : List Column
     , pinnedMilestones : Dict.Dict String String
+    , filterStoriesBy : String
     }
 
 
@@ -151,6 +152,7 @@ init persistentData location =
                 All
                 showColumns
                 pinnedMilestones
+                ""
 
         -- needFocus
     in
@@ -305,6 +307,9 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        FilterStories s ->
+            { model | filterStoriesBy = s } ! []
 
         PinMilestone s ->
             let
@@ -1655,6 +1660,9 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                     Nothing
     in
         issues
+            |> List.filter (\issue ->
+                model.filterStoriesBy == "" || String.contains (String.toLower model.filterStoriesBy) (String.toLower issue.title)
+            )
             |> List.map
                 (\issue ->
                     div
@@ -1674,6 +1682,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                             , Html.a
                                 [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
                                 , onClick <| SelectStory issue
+                                --, Attrs.href <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
                                 ]
                                 [ text <| " " ++ issue.title ++ " " ]
                             , Html.i [ style [ ( "color", "darkgrey" ) ] ]
@@ -1746,19 +1755,22 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
 
                             _ ->
                                 (if model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
-                                    Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory addto ]
+                                    (Html.form [ cellExStyle [ ( "background", "#333" ) ], Html.Events.onSubmit <| CreateStory addto ]
                                         [ Html.input [ Attrs.id "create-story", style [ ( "width", "90%" ) ], onInput EditNewStoryTitle, Attrs.value model.newIssueTitle ] []
                                         , Html.button [ style buttonStyle ] [ text "Add" ]
                                         , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
                                         ]
+                                    ) :: list
                                  else
-                                    text ""
+                                     list
                                 )
-                                    :: list
                     else
                         list
                )
             |> (\list ->
+                if List.isEmpty list then
+                    []
+                else
                     [ div
                         [ style
                             [ ( "background", "#111" )
@@ -1944,6 +1956,8 @@ viewTopbar user location model =
                  else
                      span [] <| (text " Reopen column: ") :: list
                  )
+        , text " Filter stories: "
+        , Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
         ]
 
 reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
