@@ -21,6 +21,14 @@ type alias PersistedData =
     { accessToken : Maybe String
     , pinnedMilestones : List (String, String)
     , columns : List String
+    , defaultRepositoryType : String
+    , defaultRepository : String
+    , recentRepos : List String
+    }
+
+type alias Settings =
+    { defaultRepositoryType : String
+    , defaultRepository : String
     }
 
 type Filter

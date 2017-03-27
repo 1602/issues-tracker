@@ -8,6 +8,7 @@ type Route
     = IssuesIndex String String
     | Story String String String
     | MilestonesIndex String String
+    | Settings String String
 
 
 route : Parser (Route -> a) a
@@ -20,6 +21,7 @@ route =
             [ map IssuesIndex (string </> string </> s "stories")
             , map MilestonesIndex (string </> string </> s  "milestones")
             , map Story (string </> string </> s "stories" </> string)
+            , map Settings (string </> string </> s  "settings")
             ]
 
 parseHash : Location -> Maybe Route

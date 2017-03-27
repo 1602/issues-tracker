@@ -42,4 +42,6 @@ type Msg
     | ReopenColumn Column
     | PinMilestone String
     | FilterStories String
+    | ChangeDefaultRepositoryType String
+    | UpdateDefaultRepository String
 

@@ -66,7 +66,8 @@ extractRepo hash =
 
 
 type alias Model =
-    { user : Maybe User
+    { settings : Settings
+    , user : Maybe User
     , token : String
     , accessToken : Maybe String
     , repo : String
@@ -89,6 +90,7 @@ type alias Model =
     , showColumns : List Column
     , pinnedMilestones : Dict.Dict String String
     , filterStoriesBy : String
+    , recentRepos : List String
     }
 
 
@@ -110,26 +112,32 @@ init persistentData location =
             persistentData.pinnedMilestones
                 |> Dict.fromList
 
-
         showColumns =
             persistentData.columns
-                |> List.map (\s ->
-                    case s of
-                        "Current" ->
-                            Current
+                |> List.map
+                    (\s ->
+                        case s of
+                            "Current" ->
+                                Current
 
-                        "Done" ->
-                            Done
+                            "Done" ->
+                                Done
 
-                        "Icebox" ->
-                            Icebox
+                            "Icebox" ->
+                                Icebox
 
-                        _ ->
-                            Backlog
-                )
+                            _ ->
+                                Backlog
+                    )
+
+        initSettings x =
+            Models.Settings
+                x.defaultRepositoryType
+                x.defaultRepository
 
         model =
             Model
+                (initSettings persistentData)
                 Nothing
                 ""
                 persistentData.accessToken
@@ -153,6 +161,7 @@ init persistentData location =
                 showColumns
                 pinnedMilestones
                 ""
+                []
 
         -- needFocus
     in
@@ -226,6 +235,9 @@ loadResource model =
             case model.user of
                 Just user ->
                     case parseHash model.location of
+                        Just (Settings user repo) ->
+                            []
+
                         Just (Story user repo id) ->
                             loadAllIssues model
 
@@ -256,10 +268,15 @@ port clipboard : String -> Cmd msg
 
 updateLocalStorage : Model -> Cmd msg
 updateLocalStorage model =
-    saveData <| PersistedData
-        model.accessToken
-        (Dict.toList model.pinnedMilestones)
-        (List.map toString model.showColumns)
+    saveData <|
+        PersistedData
+            model.accessToken
+            (Dict.toList model.pinnedMilestones)
+            (List.map toString model.showColumns)
+            model.settings.defaultRepositoryType
+            model.settings.defaultRepository
+            model.recentRepos
+
 
 
 -- UPDATE
@@ -308,6 +325,36 @@ update msg model =
         NoOp ->
             model ! []
 
+        UpdateDefaultRepository s ->
+            let
+                settings =
+                    model.settings
+
+                updatedSettings =
+                    { settings
+                        | defaultRepository = s
+                    }
+
+                updatedModel =
+                    { model | settings = updatedSettings }
+            in
+                updatedModel ! [ updateLocalStorage updatedModel ]
+
+        ChangeDefaultRepositoryType s ->
+            let
+                settings =
+                    model.settings
+
+                updatedSettings =
+                    { settings
+                        | defaultRepositoryType = s
+                    }
+
+                updatedModel =
+                    { model | settings = updatedSettings }
+            in
+                updatedModel ! [ updateLocalStorage updatedModel ]
+
         FilterStories s ->
             { model | filterStoriesBy = s } ! []
 
@@ -326,41 +373,40 @@ update msg model =
 
                 updatedModel =
                     { model
-                    | pinnedMilestones =
-                        model.pinnedMilestones
-                            |> Dict.insert model.repo n
+                        | pinnedMilestones =
+                            model.pinnedMilestones
+                                |> Dict.insert model.repo n
                     }
-
             in
-                updatedModel ! (
-                    if n /= "" then
+                updatedModel
+                    ! (if n /= "" then
                         [ setFocus <| "milestone-" ++ n, updateLocalStorage updatedModel ]
-                    else
+                       else
                         [ updateLocalStorage updatedModel ]
-                )
+                      )
 
         HideColumn s ->
             let
                 updatedModel =
                     { model
-                    | showColumns =
-                        model.showColumns
-                            |> List.filter ((/=) s)
+                        | showColumns =
+                            model.showColumns
+                                |> List.filter ((/=) s)
                     }
             in
-               updatedModel ! [ updateLocalStorage updatedModel ]
+                updatedModel ! [ updateLocalStorage updatedModel ]
 
         ReopenColumn s ->
             let
                 updatedModel =
                     { model
-                    | showColumns =
-                        model.showColumns
-                            |> List.filter ((/=) s)
-                            |> (::) s
+                        | showColumns =
+                            model.showColumns
+                                |> List.filter ((/=) s)
+                                |> (::) s
                     }
             in
-               updatedModel ! [ updateLocalStorage updatedModel ]
+                updatedModel ! [ updateLocalStorage updatedModel ]
 
         ChangeFilter s ->
             case model.user of
@@ -428,13 +474,13 @@ update msg model =
                                         "" ->
                                             Encode.null
                                                 |> Debug.log "create without milestone"
+
                                         _ ->
                                             model.addIssueToMilestone
                                                 |> Debug.log "create within milestone"
                                                 |> String.toInt
                                                 |> Result.withDefault 0
                                                 |> Encode.int
-
                                    )
                                  , ( "assignees"
                                    , case col of
@@ -452,12 +498,13 @@ update msg model =
                                  ]
                                     |> Encode.object
                                 )
-                                (StoryCreated col (
-                                    model.milestones
+                                (StoryCreated col
+                                    (model.milestones
                                         |> Maybe.withDefault Dict.empty
                                         |> Dict.get model.addIssueToMilestone
                                         |> Maybe.andThen (\ms -> Just ms.milestone)
-                                ))
+                                    )
+                                )
                             ]
                            else
                             []
@@ -528,7 +575,7 @@ update msg model =
                 if model.token == "" then
                     model ! [ Navigation.load "https://github.com/settings/tokens" ]
                 else
-                    updatedModel ! ([fetchUser model.token, updateLocalStorage updatedModel] ++ (loadResource updatedModel))
+                    updatedModel ! ([ fetchUser model.token, updateLocalStorage updatedModel ] ++ (loadResource updatedModel))
 
         CurrentDate now ->
             { model | now = now } ! []
@@ -569,12 +616,23 @@ update msg model =
                     else
                         Nothing
 
+                recentRepos =
+                    if (Maybe.withDefault "" <| List.head model.recentRepos) == repo then
+                        model.recentRepos
+                    else
+                        repo :: (
+                            model.recentRepos
+                                |> List.filter ((/=) repo)
+                                |> List.take 19
+                        )
+
                 updatedModel =
                     ({ model
                         | location = location
                         , repo = repo
                         , currentIssues = issues
                         , milestones = milestones
+                        , recentRepos = recentRepos
                      }
                         |> aboutToLoadResource location
                     )
@@ -685,39 +743,56 @@ update msg model =
                     { model | error = Just (toString error) } ! []
 
                 Ok milestones ->
-                    { model
-                        | milestones =
-                            milestones
-                                |> List.foldl
-                                    (\ms ->
-                                        Dict.update ms.number
-                                            (\m ->
-                                                Just <|
-                                                    case m of
-                                                        Just m ->
-                                                            { m | milestone = ms }
+                    let
+                        recentRepos =
+                            if (Maybe.withDefault "" <| List.head model.recentRepos) == model.repo then
+                                model.recentRepos
+                            else
+                                model.repo :: (
+                                    model.recentRepos
+                                        |> List.filter ((/=) model.repo)
+                                        |> List.take 19
+                                )
 
-                                                        Nothing ->
-                                                            ExpandedMilestone
-                                                                ms
-                                                                (if ms.openIssues > 0 then
-                                                                    Nothing
-                                                                 else
-                                                                    Just []
-                                                                )
-                                                                (if ms.closedIssues > 0 then
-                                                                    Nothing
-                                                                 else
-                                                                    Just []
-                                                                )
-                                            )
-                                    )
-                                    (model.milestones |> Maybe.withDefault Dict.empty)
-                                |> Just
-                        , error = Nothing
-                    }
+                        updatedMilestones =
+                            List.foldl
+                                (\ms ->
+                                    Dict.update ms.number
+                                        (\m ->
+                                            Just <|
+                                                case m of
+                                                    Just m ->
+                                                        { m | milestone = ms }
+
+                                                    Nothing ->
+                                                        ExpandedMilestone
+                                                            ms
+                                                            (if ms.openIssues > 0 then
+                                                                Nothing
+                                                             else
+                                                                Just []
+                                                            )
+                                                            (if ms.closedIssues > 0 then
+                                                                Nothing
+                                                             else
+                                                                Just []
+                                                            )
+                                        )
+                                )
+                                (model.milestones |> Maybe.withDefault Dict.empty)
+                                milestones
+
+                        updatedModel =
+                            { model
+                                | milestones = Just updatedMilestones
+                                , recentRepos = recentRepos
+                                , error = Nothing
+                            }
+                    in
+                        updatedModel
                         ! (case model.accessToken of
                             Just token ->
+                                (updateLocalStorage updatedModel) ::
                                 (milestones
                                     |> List.filter (\ms -> ms.openIssues > 0)
                                     |> List.map (fetchMilestoneIssues model.filter model.repo token IssueOpen)
@@ -1088,7 +1163,7 @@ view model =
         case model.user of
             Just user ->
                 div []
-                    [ viewTopbar user model.location model
+                    [ viewTopbar user model
                     , viewPage user model <| parseHash model.location
                     , error
                     , case model.pickMilestoneForIssue of
@@ -1380,10 +1455,13 @@ viewPage user model route =
                                 ]
                                 [ text "×" ]
                             ]
-                        , div [ style [
-                            ( "overflow-y", "auto" )
-                            , ( "height", "calc(100% - 43px)" )
-                            ]] [ Maybe.withDefault (span [ cellStyle "calc(100% - 8px)" ] [ text "Loading..." ]) content ]
+                        , div
+                            [ style
+                                [ ( "overflow-y", "auto" )
+                                , ( "height", "calc(100% - 43px)" )
+                                ]
+                            ]
+                            [ Maybe.withDefault (span [ cellStyle "calc(100% - 8px)" ] [ text "Loading..." ]) content ]
                         ]
                 else
                     text ""
@@ -1485,6 +1563,24 @@ viewPage user model route =
                     MilestonesIndex user repo ->
                         milestonesIndex
 
+                    Settings user repo ->
+                        viewSettings model
+
+
+viewSettings : Model -> Html Msg
+viewSettings model =
+    div []
+        [ Html.h3 [] [ text "Default repository" ]
+        , Html.select [ onInput ChangeDefaultRepositoryType ]
+            [ Html.option [ Attrs.selected <| model.settings.defaultRepositoryType == "last visited" ] [ text "last visited" ]
+            , Html.option [ Attrs.selected <| model.settings.defaultRepositoryType == "specified" ] [ text "specified" ]
+            ]
+        , if model.settings.defaultRepositoryType == "specified" then
+            Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
+        else
+            text ""
+        ]
+
 
 listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Model -> Html Msg
 listIssuesWithinMilestones milestones issueState now model =
@@ -1554,9 +1650,9 @@ listIssuesWithinMilestones milestones issueState now model =
                                 displayIssuesOrLoading head expandedMilestone.closedIssues
 
                     heading =
-                        (if expandedMilestone.milestone.number == (Maybe.withDefault "" <| Dict.get model.repo model.pinnedMilestones) then
+                        ( if expandedMilestone.milestone.number == (Maybe.withDefault "" <| Dict.get model.repo model.pinnedMilestones) then
                             Just "📌"
-                        else
+                          else
                             Just "🏁"
                           -- , Html.a [ Attrs.target "_blank", Attrs.href expandedMilestone.milestone.htmlUrl ] [ text <| expandedMilestone.milestone.title ++ " " ]
                         , Html.span
@@ -1564,19 +1660,21 @@ listIssuesWithinMilestones milestones issueState now model =
                             , Attrs.class "no-outline"
                             , Attrs.id <| "milestone-" ++ expandedMilestone.milestone.number
                             , onClick <| PinMilestone expandedMilestone.milestone.number
-                            , style [ ("cursor", "pointer" ) ]
-                            ] [ text <| expandedMilestone.milestone.title
-                            ++ (case expandedMilestone.milestone.dueOn of
-                                    Just date ->
-                                        if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
-                                            " overdue"
-                                        else
-                                            " due in " ++ (Distance.inWords now date)
+                            , style [ ( "cursor", "pointer" ) ]
+                            ]
+                            [ text <|
+                                expandedMilestone.milestone.title
+                                    ++ (case expandedMilestone.milestone.dueOn of
+                                            Just date ->
+                                                if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
+                                                    " overdue"
+                                                else
+                                                    " due in " ++ (Distance.inWords now date)
 
-                                    Nothing ->
-                                        " (no due date)"
-                               )
-                           ]
+                                            Nothing ->
+                                                " (no due date)"
+                                       )
+                            ]
                         )
                 in
                     if hasIssues || True then
@@ -1595,7 +1693,7 @@ buttonStyle =
     , ( "background", "#eee" )
     , ( "color", "#222" )
     , ( "cursor", "pointer" )
-    -- , ( "line-height", "30px" )
+      -- , ( "line-height", "30px" )
     , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
     , ( "border-radius", "1px" )
     , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
@@ -1660,9 +1758,10 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                     Nothing
     in
         issues
-            |> List.filter (\issue ->
-                model.filterStoriesBy == "" || String.contains (String.toLower model.filterStoriesBy) (String.toLower issue.title)
-            )
+            |> List.filter
+                (\issue ->
+                    model.filterStoriesBy == "" || String.contains (String.toLower model.filterStoriesBy) (String.toLower issue.title)
+                )
             |> List.map
                 (\issue ->
                     div
@@ -1681,10 +1780,10 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
                                 [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
-                                --, onClick <| SelectStory issue
+                                  --, onClick <| SelectStory issue
                                 , if model.highlightStory == issue.number then
                                     Attrs.href <| "#/" ++ model.repo ++ "/stories"
-                                else
+                                  else
                                     Attrs.href <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
                                 ]
                                 [ text <| " " ++ issue.title ++ " " ]
@@ -1763,38 +1862,56 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                                         , Html.button [ style buttonStyle ] [ text "Add" ]
                                         , Html.span [ style [ ( "cursor", "pointer" ) ], onClick <| ShowIssueCreationForm Done "" ] [ text "Cancel" ]
                                         ]
-                                    ) :: list
+                                    )
+                                        :: list
                                  else
-                                     list
+                                    list
                                 )
                     else
                         list
                )
             |> (\list ->
-                if List.isEmpty list then
-                    []
-                else
-                    [ div
-                        [ style
-                            [ ( "background", "#111" )
-                            , ( "padding", "2px" )
-                              -- , ( "width", "408px" )
-                            , ( "margin-top", "4px" )
-                            , ( "margin-right", "4px" )
-                            ]
-                        ]
-                        ([ Html.strong []
-                            [ Html.span
-                                [ cellExStyle
-                                    [ ( "width", "calc(100% - 4px)" )
-                                    , ( "background", "#111" )
-                                    , ( "padding", "2px" )
-                                    ]
+                    if List.isEmpty list then
+                        []
+                    else
+                        [ div
+                            [ style
+                                [ ( "background", "#111" )
+                                , ( "padding", "2px" )
+                                  -- , ( "width", "408px" )
+                                , ( "margin-top", "4px" )
+                                , ( "margin-right", "4px" )
                                 ]
-                                [ text <| (Maybe.withDefault "" icon) ++ " "
-                                , head
-                                , if col == Done || not allowAdd || model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
-                                    if allowAdd && col /= Done then
+                            ]
+                            ([ Html.strong []
+                                [ Html.span
+                                    [ cellExStyle
+                                        [ ( "width", "calc(100% - 4px)" )
+                                        , ( "background", "#111" )
+                                        , ( "padding", "2px" )
+                                        ]
+                                    ]
+                                    [ text <| (Maybe.withDefault "" icon) ++ " "
+                                    , head
+                                    , if col == Done || not allowAdd || model.addIssueToColumn == addto && model.addIssueToMilestone == milestoneNumber then
+                                        if allowAdd && col /= Done then
+                                            span
+                                                [ style
+                                                    [ ( "position", "absolute" )
+                                                    , ( "right", "0px" )
+                                                    , ( "width", "20px" )
+                                                    , ( "height", "20px" )
+                                                    , ( "background", "#111" )
+                                                    , ( "line-height", "20px" )
+                                                    , ( "text-align", "center" )
+                                                    , ( "cursor", "pointer" )
+                                                    ]
+                                                , onClick <| ShowIssueCreationForm Done ""
+                                                ]
+                                                [ text " - " ]
+                                        else
+                                            text ""
+                                      else
                                         span
                                             [ style
                                                 [ ( "position", "absolute" )
@@ -1806,32 +1923,15 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                                                 , ( "text-align", "center" )
                                                 , ( "cursor", "pointer" )
                                                 ]
-                                            , onClick <| ShowIssueCreationForm Done ""
+                                            , onClick <| ShowIssueCreationForm addto milestoneNumber
                                             ]
-                                            [ text " - " ]
-                                    else
-                                        text ""
-                                  else
-                                    span
-                                        [ style
-                                            [ ( "position", "absolute" )
-                                            , ( "right", "0px" )
-                                            , ( "width", "20px" )
-                                            , ( "height", "20px" )
-                                            , ( "background", "#111" )
-                                            , ( "line-height", "20px" )
-                                            , ( "text-align", "center" )
-                                            , ( "cursor", "pointer" )
-                                            ]
-                                        , onClick <| ShowIssueCreationForm addto milestoneNumber
-                                        ]
-                                        [ text " + " ]
+                                            [ text " + " ]
+                                    ]
                                 ]
-                            ]
-                         ]
-                            ++ list
-                        )
-                    ]
+                             ]
+                                ++ list
+                            )
+                        ]
                )
             |> div []
 
@@ -1902,8 +2002,8 @@ textareaStyle =
         ]
 
 
-viewTopbar : User -> Location -> Model -> Html Msg
-viewTopbar user location model =
+viewTopbar : User -> Model -> Html Msg
+viewTopbar user model =
     div []
         [ div
             [ style
@@ -1912,13 +2012,13 @@ viewTopbar user location model =
                 , ( "vertical-align", "middle" )
                 ]
             ]
-            [ span [] [ text user.login ]
+            [ Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ] [ text user.login ]
             , img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
             ]
         , [ viewLink "stories" (text "Stories")
           , viewLink "milestones" (text "Milestones")
           ]
-            |> List.map (\s -> s location)
+            |> List.map (\s -> s model.location)
             |> Html.ul
                 [ style
                     [ ( "list-style", "none" )
@@ -1954,14 +2054,15 @@ viewTopbar user location model =
             |> reopeningColumnButton Backlog model.showColumns
             |> reopeningColumnButton Icebox model.showColumns
             |> (\list ->
-                 if List.isEmpty list then
-                     text ""
-                 else
-                     span [] <| (text " Reopen column: ") :: list
-                 )
+                    if List.isEmpty list then
+                        text ""
+                    else
+                        span [] <| (text " Reopen column: ") :: list
+               )
         , text " Filter stories: "
         , Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
         ]
+
 
 reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
 reopeningColumnButton col showColumns list =
@@ -1969,6 +2070,7 @@ reopeningColumnButton col showColumns list =
         list
     else
         (Html.button [ style buttonStyle, onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
+
 
 viewLink : String -> Html msg -> Location -> Html msg
 viewLink src childNode location =
@@ -2017,4 +2119,3 @@ viewLink src childNode location =
                 ]
             ]
             [ link ]
-

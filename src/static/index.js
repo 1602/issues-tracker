@@ -15,8 +15,24 @@ try {
     if (!appData.columns) {
         appData.columns = [ "Icebox", "Backlog", "Current", "Done" ];
     }
+    if (!appData.defaultRepositoryType) {
+        appData.defaultRepositoryType = 'specified';
+    }
+    if (!appData.defaultRepository) {
+        appData.defaultRepository = 'universalbasket/engineering';
+    }
+    if (!appData.recentRepos) {
+        appDate.recentRepos = [ 'universalbasket/engineering' ];
+    }
 } catch(e) {
-    appData = { accessToken: null, pinnedMilestones: [], columns: [ "Icebox", "Backlog", "Current", "Done" ] };
+    appData =
+        { accessToken: null
+        , pinnedMilestones: []
+        , columns: [ "Icebox", "Backlog", "Current", "Done" ]
+        , defaultRepositoryType : 'specified'
+        , defaultRepository : 'universalbasket/engineering'
+        , recentRepos : [ 'universalbasket/engineering' ]
+        };
 }
 
 // inject bundled Elm app into div#main
