@@ -1681,8 +1681,11 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
                                 [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
-                                , onClick <| SelectStory issue
-                                --, Attrs.href <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
+                                --, onClick <| SelectStory issue
+                                , if model.highlightStory == issue.number then
+                                    Attrs.href <| "#/" ++ model.repo ++ "/stories"
+                                else
+                                    Attrs.href <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
                                 ]
                                 [ text <| " " ++ issue.title ++ " " ]
                             , Html.i [ style [ ( "color", "darkgrey" ) ] ]
