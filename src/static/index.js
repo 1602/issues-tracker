@@ -24,6 +24,9 @@ try {
     if (!appData.recentRepos) {
         appDate.recentRepos = [ 'universalbasket/engineering' ];
     }
+    if (!appData.doneLimit) {
+        appDate.doneLimit = [ 'a day' ];
+    }
 } catch(e) {
     appData =
         { accessToken: null
@@ -32,6 +35,7 @@ try {
         , defaultRepositoryType : 'specified'
         , defaultRepository : 'universalbasket/engineering'
         , recentRepos : [ 'universalbasket/engineering' ]
+        , doneLimit : 'a day'
         };
 }
 

@@ -2,6 +2,8 @@ module Models exposing (..)
 
 import Base exposing (..)
 import Date
+import Dict
+import Navigation exposing (Location)
 
 
 -- import Json.Decode as Decode
@@ -16,6 +18,35 @@ type Column
 
 type IssueState = IssueOpen | IssueClosed
 
+type alias Model =
+    { settings : Settings
+    , user : Maybe User
+    , token : String
+    , accessToken : Maybe String
+    , repo : String
+    , location : Location
+    , now : Date.Date
+    , error : Maybe String
+    , currentIssues : Maybe (List Issue)
+    , iceboxIssues : Maybe (List Issue)
+    , closedIssues : Maybe (List Issue)
+    , milestones : Maybe (Dict.Dict String ExpandedMilestone)
+    , pickMilestoneForIssue : Maybe Issue
+    , lockedIssueNumber : String
+    , highlightStory : String
+    , newMilestoneTitle : String
+    , newIssueTitle : String
+    , needFocus : Bool
+    , addIssueToColumn : Column
+    , addIssueToMilestone : String
+    , filter : Filter
+    , showColumns : List Column
+    , pinnedMilestones : Dict.Dict String String
+    , filterStoriesBy : String
+    , recentRepos : List String
+    }
+
+
 
 type alias PersistedData =
     { accessToken : Maybe String
@@ -24,11 +55,13 @@ type alias PersistedData =
     , defaultRepositoryType : String
     , defaultRepository : String
     , recentRepos : List String
+    , doneLimit : String
     }
 
 type alias Settings =
     { defaultRepositoryType : String
     , defaultRepository : String
+    , doneLimit : String
     }
 
 type Filter

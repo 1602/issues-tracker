@@ -65,35 +65,6 @@ extractRepo hash =
 -- MODEL
 
 
-type alias Model =
-    { settings : Settings
-    , user : Maybe User
-    , token : String
-    , accessToken : Maybe String
-    , repo : String
-    , location : Location
-    , now : Date.Date
-    , error : Maybe String
-    , currentIssues : Maybe (List Issue)
-    , iceboxIssues : Maybe (List Issue)
-    , closedIssues : Maybe (List Issue)
-    , milestones : Maybe (Dict.Dict String ExpandedMilestone)
-    , pickMilestoneForIssue : Maybe Issue
-    , lockedIssueNumber : String
-    , highlightStory : String
-    , newMilestoneTitle : String
-    , newIssueTitle : String
-    , needFocus : Bool
-    , addIssueToColumn : Column
-    , addIssueToMilestone : String
-    , filter : Filter
-    , showColumns : List Column
-    , pinnedMilestones : Dict.Dict String String
-    , filterStoriesBy : String
-    , recentRepos : List String
-    }
-
-
 init : PersistedData -> Location -> ( Model, Cmd Msg )
 init persistentData location =
     let
@@ -134,10 +105,17 @@ init persistentData location =
             Models.Settings
                 x.defaultRepositoryType
                 x.defaultRepository
+                x.doneLimit
+
+        recentRepos =
+            persistentData.recentRepos
+
+        settings =
+            initSettings persistentData
 
         model =
             Model
-                (initSettings persistentData)
+                settings
                 Nothing
                 ""
                 persistentData.accessToken
@@ -161,9 +139,16 @@ init persistentData location =
                 showColumns
                 pinnedMilestones
                 ""
-                []
+                recentRepos
 
-        -- needFocus
+        defaultRepo =
+            if settings.defaultRepositoryType == "specified" then
+                if settings.defaultRepository == "" then
+                    Nothing
+                else
+                    Just settings.defaultRepository
+            else -- last visited
+                List.head recentRepos
     in
         model
             ! ([ Task.perform CurrentDate Date.now
@@ -176,7 +161,7 @@ init persistentData location =
                         Cmd.none
                , case page of
                     Nothing ->
-                        Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories"
+                        Navigation.modifyUrl <| "#/" ++ (Maybe.withDefault model.repo defaultRepo) ++ "/stories"
 
                     Just _ ->
                         Cmd.none
@@ -218,9 +203,9 @@ loadAllIssues : Model -> List (Cmd Msg)
 loadAllIssues model =
     case model.accessToken of
         Just accessToken ->
-            [ fetchIssues model.filter model.repo accessToken Current
-            , fetchIssues model.filter model.repo accessToken Icebox
-            , fetchIssues model.filter model.repo accessToken Done
+            [ fetchIssues model Current
+            , fetchIssues model Icebox
+            , fetchIssues model Done
             , fetchMilestones model.repo accessToken
             ]
 
@@ -276,6 +261,7 @@ updateLocalStorage model =
             model.settings.defaultRepositoryType
             model.settings.defaultRepository
             model.recentRepos
+            model.settings.doneLimit
 
 
 
@@ -324,6 +310,21 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        ChangeDoneLimit s ->
+            let
+                settings =
+                    model.settings
+
+                updatedSettings =
+                    { settings
+                        | doneLimit = s
+                    }
+
+                updatedModel =
+                    { model | settings = updatedSettings }
+            in
+                updatedModel ! [ updateLocalStorage updatedModel ]
 
         UpdateDefaultRepository s ->
             let
@@ -526,20 +527,20 @@ update msg model =
                                         Backlog ->
                                             case milestone of
                                                 Just ms ->
-                                                    fetchMilestoneIssues model.filter model.repo token IssueOpen ms
+                                                    fetchMilestoneIssues model IssueOpen ms
 
                                                 Nothing ->
-                                                    fetchIssues model.filter model.repo token Icebox
+                                                    fetchIssues model Icebox
 
                                         _ ->
-                                            fetchIssues model.filter model.repo token col
+                                            fetchIssues model col
                                   ]
 
                         Nothing ->
                             model ! []
 
         UrgentIssueAdded result ->
-            model ! [ fetchIssues model.filter model.repo (Maybe.withDefault "" model.accessToken) Icebox ]
+            model ! [ fetchIssues model Icebox ]
 
         StoryFocused ->
             { model | needFocus = False } ! []
@@ -795,11 +796,11 @@ update msg model =
                                 (updateLocalStorage updatedModel) ::
                                 (milestones
                                     |> List.filter (\ms -> ms.openIssues > 0)
-                                    |> List.map (fetchMilestoneIssues model.filter model.repo token IssueOpen)
+                                    |> List.map (fetchMilestoneIssues model IssueOpen)
                                 )
                                     ++ (milestones
                                             |> List.filter (\ms -> ms.closedIssues > 0)
-                                            |> List.map (fetchMilestoneIssues model.filter model.repo token IssueClosed)
+                                            |> List.map (fetchMilestoneIssues model IssueClosed)
                                        )
 
                             Nothing ->
@@ -857,8 +858,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model.filter model.repo token IssueOpen m
-                        , fetchIssues model.filter model.repo token Icebox
+                        [ fetchMilestoneIssues model IssueOpen m
+                        , fetchIssues model Icebox
                         ]
 
                     Nothing ->
@@ -895,8 +896,8 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model.filter model.repo token IssueOpen m
-                        , fetchIssues model.filter model.repo token Icebox
+                        [ fetchMilestoneIssues model IssueOpen m
+                        , fetchIssues model Icebox
                         ]
 
                     Nothing ->
@@ -909,13 +910,13 @@ update msg model =
                     Just token ->
                         case m of
                             Just milestone ->
-                                [ fetchMilestoneIssues model.filter model.repo token IssueClosed milestone
-                                , fetchIssues model.filter model.repo token Current
+                                [ fetchMilestoneIssues model IssueClosed milestone
+                                , fetchIssues model Current
                                 ]
 
                             Nothing ->
-                                [ fetchIssues model.filter model.repo token Done
-                                , fetchIssues model.filter model.repo token Current
+                                [ fetchIssues model Done
+                                , fetchIssues model Current
                                 ]
 
                     Nothing ->
@@ -928,13 +929,13 @@ update msg model =
                     Just token ->
                         case milestone of
                             Just m ->
-                                [ fetchMilestoneIssues model.filter model.repo token IssueOpen m
-                                , fetchIssues model.filter model.repo token Current
+                                [ fetchMilestoneIssues model IssueOpen m
+                                , fetchIssues model Current
                                 ]
 
                             Nothing ->
-                                [ fetchIssues model.filter model.repo token Current
-                                , fetchIssues model.filter model.repo token Icebox
+                                [ fetchIssues model Current
+                                , fetchIssues model Icebox
                                 ]
 
                     Nothing ->
@@ -947,13 +948,13 @@ update msg model =
                     Just token ->
                         case m of
                             Just m ->
-                                [ fetchMilestoneIssues model.filter model.repo token IssueClosed m
-                                , fetchIssues model.filter model.repo token Current
+                                [ fetchMilestoneIssues model IssueClosed m
+                                , fetchIssues model Current
                                 ]
 
                             Nothing ->
-                                [ fetchIssues model.filter model.repo token Current
-                                , fetchIssues model.filter model.repo token Done
+                                [ fetchIssues model Current
+                                , fetchIssues model Done
                                 ]
 
                     Nothing ->
@@ -1569,17 +1570,30 @@ viewPage user model route =
 
 viewSettings : Model -> Html Msg
 viewSettings model =
-    div []
-        [ Html.h3 [] [ text "Default repository" ]
-        , Html.select [ onInput ChangeDefaultRepositoryType ]
-            [ Html.option [ Attrs.selected <| model.settings.defaultRepositoryType == "last visited" ] [ text "last visited" ]
-            , Html.option [ Attrs.selected <| model.settings.defaultRepositoryType == "specified" ] [ text "specified" ]
+    let
+        option value current =
+            Html.option [ Attrs.selected <| value == current ] [ text value ]
+    in
+        div [ style [("padding", "10px")]]
+            [ Html.h3 [] [ text "Default repository" ]
+            , Html.select [ onInput ChangeDefaultRepositoryType ]
+                [ option "last visited" model.settings.defaultRepositoryType
+                , option "specified" model.settings.defaultRepositoryType
+                ]
+            , if model.settings.defaultRepositoryType == "specified" then
+                Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
+            else
+                text ""
+            , Html.p [] [ text "this setting controls repository which will be opened when visiting the kanban app" ]
+            , Html.h3 [] [ text "Limit for 'We just did it'" ]
+            , Html.select [ onInput ChangeDoneLimit ]
+                [ option "a day" model.settings.doneLimit
+                , option "a week" model.settings.doneLimit
+                , option "two weeks" model.settings.doneLimit
+                , option "a month" model.settings.doneLimit
+                ]
+            , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
             ]
-        , if model.settings.defaultRepositoryType == "specified" then
-            Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
-        else
-            text ""
-        ]
 
 
 listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Model -> Html Msg

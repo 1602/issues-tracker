@@ -44,4 +44,5 @@ type Msg
     | FilterStories String
     | ChangeDefaultRepositoryType String
     | UpdateDefaultRepository String
+    | ChangeDoneLimit String
 

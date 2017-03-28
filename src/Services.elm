@@ -9,6 +9,8 @@ import Decoders exposing (..)
 import Models exposing (..)
 import Json.Encode as Encode
 import Dict
+import Date.Extra as Date exposing (Interval(..))
+import Models exposing (Model)
 
 
 -- import Json.Encode as Encode
@@ -109,9 +111,18 @@ createIssue repo accessToken data onComplete =
             |> Http.send onComplete
 
 
-fetchMilestoneIssues : Filter -> String -> String -> IssueState -> Milestone -> Cmd Msg
-fetchMilestoneIssues filter repo accessToken issueState ms =
+fetchMilestoneIssues : Model -> IssueState -> Milestone -> Cmd Msg
+fetchMilestoneIssues model issueState ms =
     let
+        filter =
+            model.filter
+
+        repo =
+            model.repo
+
+        accessToken =
+            Maybe.withDefault "" model.accessToken
+
         state =
             case issueState of
                 IssueOpen ->
@@ -133,6 +144,34 @@ fetchMilestoneIssues filter repo accessToken issueState ms =
 
                 All ->
                     ""
+
+        pastMoment duration interval =
+            model.now
+                |> Date.add interval duration
+                |> Date.toUtcIsoString
+                |> (++) "&since="
+
+        since =
+            case issueState of
+                IssueClosed ->
+                    case model.settings.doneLimit of
+                        "a day" ->
+                            pastMoment -1 Day
+
+                        "a week" ->
+                            pastMoment -1 Week
+
+                        "two weeks" ->
+                            pastMoment -2 Week
+
+                        "a month" ->
+                            pastMoment -1 Month
+
+                        _ ->
+                    ""
+
+                IssueOpen ->
+                    ""
     in
         Http.request
             { method = "GET"
@@ -146,6 +185,7 @@ fetchMilestoneIssues filter repo accessToken issueState ms =
                     ++ "&sort=updated"
                     ++ "&milestone=" ++ ms.number
                     ++ filterByUser
+                    ++ since
             , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
             , body = Http.emptyBody
             , timeout = Nothing
@@ -153,9 +193,21 @@ fetchMilestoneIssues filter repo accessToken issueState ms =
             }
                 |> Http.send (MilestoneIssuesLoaded ms.number issueState)
 
-fetchIssues : Filter -> String -> String -> Column -> Cmd Msg
-fetchIssues filter repo accessToken column =
+fetchIssues : Model -> Column -> Cmd Msg
+fetchIssues model column =
     let
+        now =
+            model.now
+
+        filter =
+           model.filter
+
+        repo =
+           model.repo
+
+        accessToken =
+            Maybe.withDefault "" model.accessToken
+
         milestone =
             case column of
                 Icebox ->
@@ -202,6 +254,33 @@ fetchIssues filter repo accessToken column =
 
                 All ->
                     ""
+
+        pastMoment duration interval =
+            now
+                |> Date.add interval duration
+                |> Date.toUtcIsoString
+                |> (++) "&since="
+
+        since =
+            case column of
+                Done ->
+                    case model.settings.doneLimit of
+                        "a day" ->
+                            pastMoment -1 Day
+
+                        "a week" ->
+                            pastMoment -1 Week
+
+                        "two weeks" ->
+                            pastMoment -2 Week
+
+                        "a month" ->
+                            pastMoment -1 Month
+
+                        _ ->
+                            ""
+                _ ->
+                    ""
     in
         Http.request
             { method = "GET"
@@ -216,6 +295,7 @@ fetchIssues filter repo accessToken column =
                     ++ state
                     ++ milestone
                     ++ filterByUser
+                    ++ since
             , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
             , body = Http.emptyBody
             , timeout = Nothing
