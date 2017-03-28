@@ -5,7 +5,7 @@ let appData;
 
 try {
     appData = JSON.parse(localStorage.appData);
-    if (appData.user) {
+    if (!appData.accessToken && appData.user) {
         appData.accessToken = appData.user.secretKey;
         delete appData.user;
     }
