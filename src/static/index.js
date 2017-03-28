@@ -22,12 +22,13 @@ try {
         appData.defaultRepository = 'universalbasket/engineering';
     }
     if (!appData.recentRepos) {
-        appDate.recentRepos = [ 'universalbasket/engineering' ];
+        appData.recentRepos = [ 'universalbasket/engineering' ];
     }
     if (!appData.doneLimit) {
-        appDate.doneLimit = [ 'a day' ];
+        appData.doneLimit = [ 'a day' ];
     }
 } catch(e) {
+    console.log(e);
     appData =
         { accessToken: null
         , pinnedMilestones: []
