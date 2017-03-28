@@ -1013,7 +1013,7 @@ update msg model =
                                             [ ( "labels"
                                               , issue.labels
                                                     |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.filter ((/=) "Status: In Progress")
                                                     |> (::) "Status: Completed"
                                                     |> List.map Encode.string
                                                     |> Encode.list
@@ -1033,7 +1033,7 @@ update msg model =
                                             [ ( "labels"
                                               , issue.labels
                                                     |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.filter ((/=) "Status: In Progress")
                                                     |> (::) "Status: In Progress"
                                                     |> List.map Encode.string
                                                     |> Encode.list
@@ -1053,7 +1053,7 @@ update msg model =
                                             [ ( "labels"
                                               , issue.labels
                                                     |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: In Progress")
+                                                    |> List.filter ((/=) "Status: In Progress")
                                                     |> List.map Encode.string
                                                     |> Encode.list
                                               )
@@ -1074,7 +1074,7 @@ update msg model =
                                             [ ( "labels"
                                               , issue.labels
                                                     |> List.map .name
-                                                    |> List.filter (\s -> s /= "Status: Ready")
+                                                    |> List.filter ((/=) "Status: Ready")
                                                     |> List.map Encode.string
                                                     |> Encode.list
                                               )
@@ -1160,6 +1160,43 @@ view model =
 
                 Nothing ->
                     text ""
+
+        pickMilestoneModal issue =
+            div
+                [ style
+                    [ ( "position", "fixed" )
+                    , ( "top", "70px" )
+                    , ( "left", "50%" )
+                    , ( "margin-left", "-200px" )
+                    , ( "width", "400px" )
+                    , ( "padding", "10px" )
+                    , ( "background", "#777" )
+                    , ( "border", "2px solid #bbb" )
+                    ]
+                ]
+                [ div [] [ text "Select milestone for issue " ]
+                , Html.strong [] [ text <| "#" ++ issue.number ]
+                , text <| " " ++ issue.title
+                , Html.hr [] []
+                , model.milestones
+                    |> Maybe.withDefault Dict.empty
+                    |> Dict.values
+                    |> List.map
+                        (\s ->
+                            Html.li [ style [ ( "list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
+                        )
+                    |> (\list ->
+                            list
+                                ++ [ Html.li [ style [ ( "list-style", "none" ) ] ]
+                                        [ Html.input [ onInput EditNewMilestoneTitle ] []
+                                        , Html.button [ onClick CreateNewMilestone ] [ text "Create" ]
+                                        ]
+                                   ]
+                       )
+                    |> Html.ul []
+                , Html.hr [] []
+                , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
+                ]
     in
         case model.user of
             Just user ->
@@ -1167,46 +1204,9 @@ view model =
                     [ viewTopbar user model
                     , viewPage user model <| parseHash model.location
                     , error
-                    , case model.pickMilestoneForIssue of
-                        Just issue ->
-                            div
-                                [ style
-                                    [ ( "position", "fixed" )
-                                    , ( "top", "70px" )
-                                    , ( "left", "50%" )
-                                    , ( "margin-left", "-200px" )
-                                    , ( "width", "400px" )
-                                    , ( "padding", "10px" )
-                                    , ( "background", "#777" )
-                                    , ( "border", "2px solid #bbb" )
-                                    ]
-                                ]
-                                [ div [] [ text "Select milestone for issue " ]
-                                , Html.strong [] [ text <| "#" ++ issue.number ]
-                                , text <| " " ++ issue.title
-                                , Html.hr [] []
-                                , model.milestones
-                                    |> Maybe.withDefault Dict.empty
-                                    |> Dict.values
-                                    |> List.map
-                                        (\s ->
-                                            Html.li [ style [ ( "list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
-                                        )
-                                    |> (\list ->
-                                            list
-                                                ++ [ Html.li [ style [ ( "list-style", "none" ) ] ]
-                                                        [ Html.input [ onInput EditNewMilestoneTitle ] []
-                                                        , Html.button [ onClick CreateNewMilestone ] [ text "Create" ]
-                                                        ]
-                                                   ]
-                                       )
-                                    |> Html.ul []
-                                , Html.hr [] []
-                                , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
-                                ]
-
-                        Nothing ->
-                            text ""
+                    , model.pickMilestoneForIssue
+                        |> Maybe.andThen (pickMilestoneModal >> Just)
+                        |> Maybe.withDefault (text "")
                     ]
 
             Nothing ->
