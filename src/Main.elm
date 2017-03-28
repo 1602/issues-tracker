@@ -2083,7 +2083,7 @@ reopeningColumnButton col showColumns list =
     if List.member col showColumns then
         list
     else
-        (Html.button [ style buttonStyle, onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
+        (Html.button [ style (buttonStyle |> List.filter (\(s,_) -> s /= "margin-top")), onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
 
 
 viewLink : String -> Html msg -> Location -> Html msg

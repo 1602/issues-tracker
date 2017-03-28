@@ -25,7 +25,7 @@ try {
         appData.recentRepos = [ 'universalbasket/engineering' ];
     }
     if (!appData.doneLimit) {
-        appData.doneLimit = [ 'a day' ];
+        appData.doneLimit = 'a day'
     }
 } catch(e) {
     console.log(e);
