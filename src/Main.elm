@@ -2030,7 +2030,7 @@ textareaStyle =
 
 viewTopbar : User -> Model -> Html Msg
 viewTopbar user model =
-    div []
+    div [ style [ ( "line-height", "28px" ), ( "height", "41px" ) ] ]
         [ div
             [ style
                 [ ( "position", "absolute" )
@@ -2142,6 +2142,7 @@ viewLink src childNode location =
                 , ( "font-weight", "700" )
                 , ( "background", color )
                 , ( "color", "black" )
+                -- , ( "height", "30px" )
                 ]
             ]
             [ link ]
