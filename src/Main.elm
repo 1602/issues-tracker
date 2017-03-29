@@ -989,6 +989,8 @@ update msg model =
                                                     [ ( "labels"
                                                       , issue.labels
                                                             |> List.map .name
+                                                            |> List.filter ((/=) "Status: In Progress")
+                                                            |> List.filter ((/=) "Status: Ready")
                                                             |> (::) "Status: In Progress"
                                                             |> List.map Encode.string
                                                             |> Encode.list
@@ -1033,6 +1035,7 @@ update msg model =
                                             [ ( "labels"
                                               , issue.labels
                                                     |> List.map .name
+                                                    |> List.filter ((/=) "Status: Completed")
                                                     |> List.filter ((/=) "Status: In Progress")
                                                     |> (::) "Status: In Progress"
                                                     |> List.map Encode.string
@@ -1053,7 +1056,16 @@ update msg model =
                                             [ ( "labels"
                                               , issue.labels
                                                     |> List.map .name
+                                                    |> List.filter ((/=) "Status: Ready")
                                                     |> List.filter ((/=) "Status: In Progress")
+                                                    |> (\labels ->
+                                                        case issue.milestone of
+                                                            Nothing ->
+                                                                "Status: Ready" :: labels
+
+                                                            Just _ ->
+                                                                labels
+                                                        )
                                                     |> List.map Encode.string
                                                     |> Encode.list
                                               )
@@ -1480,7 +1492,7 @@ viewPage user model route =
                         |> Maybe.andThen
                             (\issues ->
                                 displayIssuesGroupedByDate
-                                    (List.filter (hasNoLabel "Status: Ready") issues)
+                                    (List.filter (\s -> (hasNoLabel "Status: Ready" s) && (hasNoLabel "Status: In Progress" s)) issues)
                                     Icebox
                                     |> div []
                                     |> Just
