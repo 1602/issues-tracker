@@ -1739,6 +1739,21 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                 ]
                 [ text title ]
 
+        getTypeClass issue =
+            issue.labels
+                |> List.foldl
+                    (\l res ->
+                        if l.name == "Type: Bug" || l.name == "bug" then
+                            Just "bug"
+                        else if l.name == "Type: Feature" || l.name == "enhancement" then
+                            Just "feature"
+                        else if l.name == "Type: Research" then
+                            Just "research"
+                        else
+                            res
+                    )
+                    Nothing
+                |> Maybe.withDefault "idea"
         getTypeIcon issue =
             issue.labels
                 |> List.foldl
@@ -1802,7 +1817,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                             ]
                         ]
                         [ span [ cellStyle "calc(100% - 4px)" ]
-                            [ span [ Attrs.class "icon" ] [ text <| getTypeIcon issue ]
+                            [ span [ Attrs.class <| "icon " ++ (getTypeClass issue) ] [ text <| getTypeIcon issue ]
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
                                 [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
