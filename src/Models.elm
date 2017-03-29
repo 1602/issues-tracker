@@ -44,8 +44,11 @@ type alias Model =
     , pinnedMilestones : Dict.Dict String String
     , filterStoriesBy : String
     , recentRepos : List String
+    , etags : Dict.Dict String String
     }
 
+
+type CachedData a = CachedData String (Maybe String) a
 
 
 type alias PersistedData =

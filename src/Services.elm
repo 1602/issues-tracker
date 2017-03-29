@@ -172,26 +172,22 @@ fetchMilestoneIssues model issueState ms =
 
                 IssueOpen ->
                     ""
+        url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/issues?access_token="
+                ++ accessToken
+                ++ state
+                ++ "&sort=updated"
+                ++ "&milestone=" ++ ms.number
+                ++ filterByUser
+                ++ since
     in
-        Http.request
-            { method = "GET"
-            , headers = [ Http.header "If-Modified-Since" "0"]
-            , url =
-                "https://api.github.com/repos/"
-                    ++ repo
-                    ++ "/issues?access_token="
-                    ++ accessToken
-                    ++ state
-                    ++ "&sort=updated"
-                    ++ "&milestone=" ++ ms.number
-                    ++ filterByUser
-                    ++ since
-            , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
-            , body = Http.emptyBody
-            , timeout = Nothing
-            , withCredentials = False
-            }
-                |> Http.send (MilestoneIssuesLoaded ms.number issueState)
+        fetch
+            url
+            model.etags
+            (Decode.list issueDecoder)
+            (MilestoneIssuesLoaded ms.number issueState)
 
 fetchIssues : Model -> Column -> Cmd Msg
 fetchIssues model column =
@@ -281,27 +277,54 @@ fetchIssues model column =
                             ""
                 _ ->
                     ""
+        url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/issues?access_token="
+                ++ accessToken
+                ++ "&sort=updated"
+                ++ labels
+                ++ state
+                ++ milestone
+                ++ filterByUser
+                ++ since
     in
-        Http.request
-            { method = "GET"
-            , headers = [ Http.header "If-Modified-Since" "0"]
-            , url =
-                "https://api.github.com/repos/"
-                    ++ repo
-                    ++ "/issues?access_token="
-                    ++ accessToken
-                    ++ "&sort=updated"
-                    ++ labels
-                    ++ state
-                    ++ milestone
-                    ++ filterByUser
-                    ++ since
-            , expect = Http.expectJson <| Decode.at [] <| Decode.list issueDecoder
-            , body = Http.emptyBody
-            , timeout = Nothing
-            , withCredentials = False
-            }
-            |> Http.send (IssuesLoaded column)
+        fetch
+            url
+            model.etags
+            (Decode.list issueDecoder)
+            (IssuesLoaded column)
+
+
+fetch : String -> Dict.Dict String String -> Decode.Decoder (List Issue) -> ((Result Error (List Issue)) -> Msg) -> Cmd Msg
+fetch url etags decoder oncomplete =
+    Http.request
+        { method = "GET"
+        , headers =
+            case Dict.get url etags of
+                Just etag ->
+                    [ Http.header "If-None-Match" etag ]
+
+                Nothing ->
+                    []
+        , url = url
+        , expect = Http.expectStringResponse (\res ->
+            if res.status.code == 304 then
+                Err "Cached"
+            else
+                case Decode.decodeString decoder res.body of
+                    Err e ->
+                        Err e
+
+                    Ok result ->
+                        Ok (CachedData url (Dict.get "ETag" res.headers) result)
+            )
+        , body = Http.emptyBody
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send (FetchComplete oncomplete)
+
 
 updateIssueWith : String -> String -> Decode.Value -> String -> (Result Error Issue -> a) -> Cmd a
 updateIssueWith repo issueNumber issue accessToken onComplete =

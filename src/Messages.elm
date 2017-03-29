@@ -45,4 +45,5 @@ type Msg
     | ChangeDefaultRepositoryType String
     | UpdateDefaultRepository String
     | ChangeDoneLimit String
+    | FetchComplete (Result Error (List Issue) -> Msg) (Result Error (CachedData (List Issue)))
 

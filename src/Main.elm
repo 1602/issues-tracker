@@ -140,6 +140,7 @@ init persistentData location =
                 pinnedMilestones
                 ""
                 recentRepos
+                Dict.empty
 
         defaultRepo =
             if settings.defaultRepositoryType == "specified" then
@@ -310,6 +311,24 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        FetchComplete msg result ->
+            case Debug.log "fetch complete" result of
+                Ok cachedData ->
+                    case cachedData of
+                        CachedData url etag res ->
+                            case etag of
+                                Just x ->
+                                    update (msg (Ok res)) { model
+                                        | etags = Dict.insert url x model.etags 
+                                    }
+
+                                Nothing ->
+                                    model ! []
+
+
+                Err r ->
+                    model ! []
 
         ChangeDoneLimit s ->
             let
@@ -1142,7 +1161,7 @@ save result model fn =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Time.every (60 * Time.second) CurrentTime
+        [ Time.every (30 * Time.second) CurrentTime
         ]
 
 
