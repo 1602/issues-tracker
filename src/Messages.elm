@@ -10,11 +10,11 @@ import Navigation exposing (Location)
 type Msg
     = NoOp
     | LoadMilestones (Result Error (List Milestone))
-    | MilestoneIssuesLoaded String IssueState (Result Error (List Issue))
+    | MilestoneIssuesLoaded String IssueState String
     | CurrentDate Date.Date
     | CurrentTime Time.Time
     | UrlChange Location
-    | IssuesLoaded Column (Result Error (List Issue))
+    | IssuesLoaded Column String
     | UnsetMilestone Milestone (Result Error Issue)
     | SetMilestone Issue Milestone
     | MilestoneSet Milestone (Result Error Issue)
@@ -45,5 +45,5 @@ type Msg
     | ChangeDefaultRepositoryType String
     | UpdateDefaultRepository String
     | ChangeDoneLimit String
-    | FetchComplete (Result Error (List Issue) -> Msg) (Result Error (CachedData (List Issue)))
+    | FetchComplete (String -> Msg) (Result Error CachedData)
 

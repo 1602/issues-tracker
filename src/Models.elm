@@ -48,7 +48,10 @@ type alias Model =
     }
 
 
-type CachedData a = CachedData String (Maybe String) a
+type CachedData
+    = CachedData String String String
+    | NotCached String
+    | NotModified
 
 
 type alias PersistedData =

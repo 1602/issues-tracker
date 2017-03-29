@@ -186,7 +186,6 @@ fetchMilestoneIssues model issueState ms =
         fetch
             url
             model.etags
-            (Decode.list issueDecoder)
             (MilestoneIssuesLoaded ms.number issueState)
 
 fetchIssues : Model -> Column -> Cmd Msg
@@ -292,12 +291,11 @@ fetchIssues model column =
         fetch
             url
             model.etags
-            (Decode.list issueDecoder)
             (IssuesLoaded column)
 
 
-fetch : String -> Dict.Dict String String -> Decode.Decoder (List Issue) -> ((Result Error (List Issue)) -> Msg) -> Cmd Msg
-fetch url etags decoder oncomplete =
+fetch : String -> Dict.Dict String String -> (String -> Msg) -> Cmd Msg
+fetch url etags oncomplete =
     Http.request
         { method = "GET"
         , headers =
@@ -310,14 +308,14 @@ fetch url etags decoder oncomplete =
         , url = url
         , expect = Http.expectStringResponse (\res ->
             if res.status.code == 304 then
-                Err "Cached"
+                Ok NotModified
             else
-                case Decode.decodeString decoder res.body of
-                    Err e ->
-                        Err e
+                case Dict.get "ETag" res.headers of
+                    Just etag ->
+                        Ok <| CachedData url etag res.body
 
-                    Ok result ->
-                        Ok (CachedData url (Dict.get "ETag" res.headers) result)
+                    Nothing ->
+                        Ok <| NotCached res.body
             )
         , body = Http.emptyBody
         , timeout = Nothing
