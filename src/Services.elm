@@ -148,6 +148,7 @@ fetchMilestoneIssues model issueState ms =
         pastMoment duration interval =
             model.now
                 |> Date.add interval duration
+                |> Date.floor Hour
                 |> Date.toUtcIsoString
                 |> (++) "&since="
 
@@ -168,8 +169,7 @@ fetchMilestoneIssues model issueState ms =
                             pastMoment -1 Month
 
                         _ ->
-                    ""
-
+                            ""
                 IssueOpen ->
                     ""
         url =
@@ -183,7 +183,7 @@ fetchMilestoneIssues model issueState ms =
                 ++ filterByUser
                 ++ since
     in
-        fetch
+        cachingFetch
             url
             model.etags
             (MilestoneIssuesLoaded ms.number issueState)
@@ -191,9 +191,6 @@ fetchMilestoneIssues model issueState ms =
 fetchIssues : Model -> Column -> Cmd Msg
 fetchIssues model column =
     let
-        now =
-            model.now
-
         filter =
            model.filter
 
@@ -251,8 +248,9 @@ fetchIssues model column =
                     ""
 
         pastMoment duration interval =
-            now
+            model.now
                 |> Date.add interval duration
+                |> Date.floor Hour
                 |> Date.toUtcIsoString
                 |> (++) "&since="
 
@@ -288,14 +286,14 @@ fetchIssues model column =
                 ++ filterByUser
                 ++ since
     in
-        fetch
+        cachingFetch
             url
             model.etags
             (IssuesLoaded column)
 
 
-fetch : String -> Dict.Dict String String -> (String -> Msg) -> Cmd Msg
-fetch url etags oncomplete =
+cachingFetch : String -> Dict.Dict String String -> (String -> Msg) -> Cmd Msg
+cachingFetch url etags oncomplete =
     Http.request
         { method = "GET"
         , headers =
