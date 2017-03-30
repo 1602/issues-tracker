@@ -9,7 +9,7 @@ import Navigation exposing (Location)
 
 type Msg
     = NoOp
-    | LoadMilestones (Result Error (List Milestone))
+    | LoadMilestones String
     | MilestoneIssuesLoaded String IssueState String
     | CurrentDate Date.Date
     | CurrentTime Time.Time

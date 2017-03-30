@@ -2,14 +2,14 @@ port module Main exposing (..)
 
 import Route exposing (Route, Route(..), parseHash)
 import Models exposing (..)
-import Decoders exposing (issueDecoder)
+import Decoders exposing (issueDecoder, milestoneDecoder)
 import Messages exposing (..)
 import Services exposing (..)
 import Dict
 import List
 import Html exposing (Html, span, text, img, div)
 import Navigation exposing (programWithFlags, Location)
-import Http exposing (Error, Response)
+import Http exposing (Error(..), Response)
 import Date
 import Time
 import Task
@@ -208,7 +208,7 @@ loadAllIssues model =
             [ fetchIssues model Current
             , fetchIssues model Icebox
             , fetchIssues model Done
-            , fetchMilestones model.repo accessToken
+            , fetchMilestones model
             ]
 
         Nothing ->
@@ -329,7 +329,14 @@ update msg model =
                             update (msg res) model
 
                 Err e ->
-                    { model | error = toString e |> Just } ! []
+                    case e of
+                        BadStatus res ->
+                            if res.status.code == 304 then
+                                model ! []
+                            else
+                                { model | error = toString e |> Just } ! []
+                        _ ->
+                            { model | error = toString e |> Just } ! []
 
         ChangeDoneLimit s ->
             let
@@ -758,80 +765,84 @@ update msg model =
                         []
                       )
 
-        LoadMilestones result ->
-            case result of
-                Err error ->
-                    { model | error = Just (toString error) } ! []
+        LoadMilestones milestonesJson ->
+            let
+                result =
+                    Decode.decodeString (Decode.list milestoneDecoder) milestonesJson
+            in
+                case result of
+                    Err error ->
+                        { model | error = Just (toString error) } ! []
 
-                Ok milestones ->
-                    let
-                        recentRepos =
-                            if (Maybe.withDefault "" <| List.head model.recentRepos) == model.repo then
-                                model.recentRepos
-                            else
-                                model.repo :: (
+                    Ok milestones ->
+                        let
+                            recentRepos =
+                                if (Maybe.withDefault "" <| List.head model.recentRepos) == model.repo then
                                     model.recentRepos
-                                        |> List.filter ((/=) model.repo)
-                                        |> List.take 19
-                                )
+                                else
+                                    model.repo :: (
+                                        model.recentRepos
+                                            |> List.filter ((/=) model.repo)
+                                            |> List.take 19
+                                    )
 
-                        updatedMilestones =
-                            List.foldl
-                                (\ms ->
-                                    Dict.update ms.number
-                                        (\m ->
-                                            Just <|
-                                                case m of
-                                                    Just m ->
-                                                        { m | milestone = ms }
+                            updatedMilestones =
+                                List.foldl
+                                    (\ms ->
+                                        Dict.update ms.number
+                                            (\m ->
+                                                Just <|
+                                                    case m of
+                                                        Just m ->
+                                                            { m | milestone = ms }
 
-                                                    Nothing ->
-                                                        ExpandedMilestone
-                                                            ms
-                                                            (if ms.openIssues > 0 then
-                                                                Nothing
-                                                             else
-                                                                Just []
-                                                            )
-                                                            (if ms.closedIssues > 0 then
-                                                                Nothing
-                                                             else
-                                                                Just []
-                                                            )
-                                        )
-                                )
-                                (model.milestones |> Maybe.withDefault Dict.empty)
-                                milestones
+                                                        Nothing ->
+                                                            ExpandedMilestone
+                                                                ms
+                                                                (if ms.openIssues > 0 then
+                                                                    Nothing
+                                                                 else
+                                                                    Just []
+                                                                )
+                                                                (if ms.closedIssues > 0 then
+                                                                    Nothing
+                                                                 else
+                                                                    Just []
+                                                                )
+                                            )
+                                    )
+                                    (model.milestones |> Maybe.withDefault Dict.empty)
+                                    milestones
 
-                        updatedModel =
-                            { model
-                                | milestones = Just updatedMilestones
-                                , recentRepos = recentRepos
-                                , error = Nothing
-                            }
-                    in
-                        updatedModel
-                        ! (case model.accessToken of
-                            Just token ->
-                                (updateLocalStorage updatedModel) ::
-                                (milestones
-                                    |> List.filter (\ms -> ms.openIssues > 0)
-                                    |> List.map (fetchMilestoneIssues model IssueOpen)
-                                )
-                                    ++ (milestones
-                                            |> List.filter (\ms -> ms.closedIssues > 0)
-                                            |> List.map (fetchMilestoneIssues model IssueClosed)
-                                       )
+                            updatedModel =
+                                { model
+                                    | milestones = Just updatedMilestones
+                                    , recentRepos = recentRepos
+                                    , error = Nothing
+                                }
+                        in
+                            updatedModel
+                            ! (case model.accessToken of
+                                Just token ->
+                                    (updateLocalStorage updatedModel) ::
+                                    (milestones
+                                        |> List.filter (\ms -> ms.openIssues > 0)
+                                        |> List.map (fetchMilestoneIssues model IssueOpen)
+                                    )
+                                        ++ (milestones
+                                                |> List.filter (\ms -> ms.closedIssues > 0)
+                                                |> List.map (fetchMilestoneIssues model IssueClosed)
+                                           )
 
-                            Nothing ->
-                                []
-                          )
+                                Nothing ->
+                                    []
+                              )
 
         MilestoneCreated result ->
             case result of
                 Ok _ ->
                     { model | error = Nothing }
-                        ! [ fetchMilestones model.repo (Maybe.withDefault "" model.accessToken)
+                        ! [ fetchMilestones model
                           ]
 
                 Err e ->
@@ -995,7 +1006,9 @@ update msg model =
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
-                                                |> updateIssue model.repo issue token
+                                                |> updateIssueWith model.repo issue.number
+                                                    (Encode.object [ ( "milestone", Encode.null ) ])
+                                                    token
                                           ]
 
                                 Nothing ->
@@ -1164,7 +1177,7 @@ save result model fn =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Time.every (30 * Time.second) CurrentTime
+        [ Time.every (60 * Time.second) CurrentTime
         ]
 
 
@@ -1188,6 +1201,10 @@ view model =
                             , ( "background", "#111" )
                             , ( "padding", "10px" )
                             , ( "border-radius", "2px" )
+                            , ( "max-width", "500px" )
+                            , ( "max-height", "350px" )
+                            , ( "overflow", "auto" )
+                            , ( "box-shadow", "0px 0px 17px 9px rgba(5,5,5,0.35)" )
                             ]
                         ]
                         [ text error ]
