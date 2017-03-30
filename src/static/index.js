@@ -27,6 +27,9 @@ try {
     if (!appData.doneLimit) {
         appData.doneLimit = 'a day'
     }
+    if (typeof appData.powerOfNow === 'undefined') {
+        appData.powerOfNow = false;
+    }
 } catch(e) {
     console.log(e);
     appData =
@@ -37,12 +40,13 @@ try {
         , defaultRepository : 'universalbasket/engineering'
         , recentRepos : [ 'universalbasket/engineering' ]
         , doneLimit : 'a day'
+        , powerOfNow : false
         };
 }
 
 // inject bundled Elm app into div#main
 const Elm = require('../Main');
-const elm = Elm.Main.embed( document.getElementById( 'main' ), appData );
+const elm = Elm.Main.embed( document.getElementById( 'main' ), [ appData, __VERSION__ ] );
 
 window.onSignIn = function(googleUser) {
     elm.ports.googleAuth.send(googleUser.getAuthResponse()['id_token']);

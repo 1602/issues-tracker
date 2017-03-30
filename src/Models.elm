@@ -20,6 +20,7 @@ type IssueState = IssueOpen | IssueClosed
 
 type alias Model =
     { settings : Settings
+    , version : String
     , user : Maybe User
     , token : String
     , accessToken : Maybe String
@@ -62,12 +63,14 @@ type alias PersistedData =
     , defaultRepository : String
     , recentRepos : List String
     , doneLimit : String
+    , powerOfNow : Bool
     }
 
 type alias Settings =
     { defaultRepositoryType : String
     , defaultRepository : String
     , doneLimit : String
+    , powerOfNow : Bool
     }
 
 type Filter

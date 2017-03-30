@@ -1,3 +1,4 @@
+const pkg = require('./package.json');
 var path              = require( 'path' );
 var webpack           = require( 'webpack' );
 var merge             = require( 'webpack-merge' );
@@ -35,6 +36,9 @@ var commonConfig = {
   },
 
   plugins: [
+    new webpack.DefinePlugin({
+      __VERSION__: JSON.stringify(pkg.version)
+    }),
     new HtmlWebpackPlugin({
       template: 'src/static/index.html',
       inject:   'body',

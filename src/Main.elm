@@ -31,7 +31,7 @@ import Json.Decode as Decode
 -- APP
 
 
-main : Program PersistedData Model Msg
+main : Program (PersistedData, String) Model Msg
 main =
     programWithFlags UrlChange
         { init = init
@@ -66,8 +66,8 @@ extractRepo hash =
 -- MODEL
 
 
-init : PersistedData -> Location -> ( Model, Cmd Msg )
-init persistentData location =
+init : (PersistedData, String) -> Location -> ( Model, Cmd Msg )
+init (persistentData, version) location =
     let
         page =
             parseHash location
@@ -107,6 +107,7 @@ init persistentData location =
                 x.defaultRepositoryType
                 x.defaultRepository
                 x.doneLimit
+                x.powerOfNow
 
         recentRepos =
             persistentData.recentRepos
@@ -117,6 +118,7 @@ init persistentData location =
         model =
             Model
                 settings
+                version
                 Nothing
                 ""
                 persistentData.accessToken
@@ -264,6 +266,7 @@ updateLocalStorage model =
             model.settings.defaultRepository
             model.recentRepos
             model.settings.doneLimit
+            model.settings.powerOfNow
 
 
 
@@ -312,6 +315,16 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        IgnoreIdeas ->
+            let
+                s =
+                    model.settings
+
+                updatedSettings =
+                    { s | powerOfNow = not s.powerOfNow }
+            in
+                { model | settings = updatedSettings } ! []
 
         FetchComplete msg result ->
             case result of
@@ -787,32 +800,35 @@ update msg model =
                                     )
 
                             updatedMilestones =
-                                List.foldl
-                                    (\ms ->
-                                        Dict.update ms.number
-                                            (\m ->
-                                                Just <|
-                                                    case m of
-                                                        Just m ->
-                                                            { m | milestone = ms }
+                                milestones
+                                    |> List.filter (\ms ->
+                                        not model.settings.powerOfNow || (ms.dueOn /= Nothing)
+                                        )
+                                    |> List.foldl
+                                        (\ms ->
+                                            Dict.update ms.number
+                                                (\m ->
+                                                    Just <|
+                                                        case m of
+                                                            Just m ->
+                                                                { m | milestone = ms }
 
-                                                        Nothing ->
-                                                            ExpandedMilestone
-                                                                ms
-                                                                (if ms.openIssues > 0 then
-                                                                    Nothing
-                                                                 else
-                                                                    Just []
-                                                                )
-                                                                (if ms.closedIssues > 0 then
-                                                                    Nothing
-                                                                 else
-                                                                    Just []
-                                                                )
-                                            )
-                                    )
-                                    (model.milestones |> Maybe.withDefault Dict.empty)
-                                    milestones
+                                                            Nothing ->
+                                                                ExpandedMilestone
+                                                                    ms
+                                                                    (if ms.openIssues > 0 then
+                                                                        Nothing
+                                                                     else
+                                                                        Just []
+                                                                    )
+                                                                    (if ms.closedIssues > 0 then
+                                                                        Nothing
+                                                                     else
+                                                                        Just []
+                                                                    )
+                                                )
+                                        )
+                                        (model.milestones |> Maybe.withDefault Dict.empty)
 
                             updatedModel =
                                 { model
@@ -1624,26 +1640,54 @@ viewSettings model =
     let
         option value current =
             Html.option [ Attrs.selected <| value == current ] [ text value ]
+
+
+        settingsBlock title contents =
+            div [ style [ ("background", "#333"), ( "border", "1px solid #555"), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
     in
         div [ style [("padding", "10px")]]
-            [ Html.h3 [] [ text "Default repository" ]
-            , Html.select [ onInput ChangeDefaultRepositoryType ]
-                [ option "last visited" model.settings.defaultRepositoryType
-                , option "specified" model.settings.defaultRepositoryType
+
+            -- default repo
+            [ settingsBlock "Default repository"
+                [ Html.select [ onInput ChangeDefaultRepositoryType ]
+                    [ option "last visited" model.settings.defaultRepositoryType
+                    , option "specified" model.settings.defaultRepositoryType
+                    ]
+                , if model.settings.defaultRepositoryType == "specified" then
+                    Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
+                else
+                    text ""
+                , Html.p [] [ text "this setting controls repository which will be opened when visiting the kanban app" ]
                 ]
-            , if model.settings.defaultRepositoryType == "specified" then
-                Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
-            else
-                text ""
-            , Html.p [] [ text "this setting controls repository which will be opened when visiting the kanban app" ]
-            , Html.h3 [] [ text "Limit for 'We just did it'" ]
-            , Html.select [ onInput ChangeDoneLimit ]
-                [ option "a day" model.settings.doneLimit
-                , option "a week" model.settings.doneLimit
-                , option "two weeks" model.settings.doneLimit
-                , option "a month" model.settings.doneLimit
+
+
+            -- limit
+            , settingsBlock "Limit for 'We just did it'"
+                [ Html.select [ onInput ChangeDoneLimit ]
+                    [ option "a day" model.settings.doneLimit
+                    , option "a week" model.settings.doneLimit
+                    , option "two weeks" model.settings.doneLimit
+                    , option "a month" model.settings.doneLimit
+                    ]
+                , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
                 ]
-            , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
+
+
+            -- focused mode: ignore milestones with no due date
+            , settingsBlock "Focus on present, ignore ideas"
+                [ Html.label [] [ Html.input [ Attrs.checked model.settings.powerOfNow, Attrs.type_ "checkbox", onClick IgnoreIdeas ] []
+                , text " ignore milestones with no due date"
+                ]
+                , Html.p []
+                    [ text <| (if model.settings.powerOfNow then "keep this box ticked" else "tick this box")
+                    , text " if you don't want to be bothered by the things that will not happen in the nearest future"
+                    ]
+                ]
+
+            , settingsBlock "Version"
+                [ Html.strong [] [ text model.version ]
+                , Html.p [] [ text "this app is in development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and grab some new bugs at the same time), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
+                ]
             ]
 
 
@@ -2103,6 +2147,8 @@ viewTopbar user model =
                 [ style
                     [ ( "list-style", "none" )
                     , ( "display", "inline-block" )
+                    , ( "margin", "0" )
+                    , ( "padding", "0" )
                     ]
                 ]
         , text " Show stories: "

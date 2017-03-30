@@ -45,5 +45,6 @@ type Msg
     | ChangeDefaultRepositoryType String
     | UpdateDefaultRepository String
     | ChangeDoneLimit String
+    | IgnoreIdeas
     | FetchComplete (String -> Msg) (Result Error CachedData)
 
