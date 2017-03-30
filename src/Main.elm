@@ -205,17 +205,11 @@ aboutToLoadResource loc model =
 
 loadAllIssues : Model -> List (Cmd Msg)
 loadAllIssues model =
-    case model.accessToken of
-        Just accessToken ->
-            [ fetchIssues model Current
-            , fetchIssues model Icebox
-            , fetchIssues model Done
-            , fetchMilestones model
-            ]
-
-        Nothing ->
-            []
-
+    [ fetchIssues model Current
+    , fetchIssues model Icebox
+    , fetchIssues model Done
+    , fetchMilestones model
+    ]
 
 loadResource : Model -> List (Cmd Msg)
 loadResource model =
@@ -527,24 +521,19 @@ update msg model =
                     { model | error = toString error |> Just } ! []
 
                 Ok _ ->
-                    case model.accessToken of
-                        Just token ->
-                            model
-                                ! [ case col of
-                                        Backlog ->
-                                            case milestone of
-                                                Just ms ->
-                                                    fetchMilestoneIssues model OpenIssue ms
+                    model
+                        ! [ case col of
+                                Backlog ->
+                                    case milestone of
+                                        Just ms ->
+                                            fetchMilestoneIssues model OpenIssue ms
 
-                                                Nothing ->
-                                                    fetchIssues model Icebox
+                                        Nothing ->
+                                            fetchIssues model Icebox
 
-                                        _ ->
-                                            fetchIssues model col
-                                  ]
-
-                        Nothing ->
-                            model ! []
+                                _ ->
+                                    fetchIssues model col
+                          ]
 
         UrgentIssueAdded result ->
             model ! [ fetchIssues model Icebox ]
@@ -871,16 +860,10 @@ update msg model =
             model ! [ clipboard str ]
 
         UnsetMilestone m result ->
-            { model | lockedIssueNumber = "" }
-                ! (case model.accessToken of
-                    Just token ->
-                        [ fetchMilestoneIssues model OpenIssue m
-                        , fetchIssues model Icebox
-                        ]
-
-                    Nothing ->
-                        []
-                  )
+            { model | lockedIssueNumber = "" } !
+                [ fetchMilestoneIssues model OpenIssue m
+                , fetchIssues model Icebox
+                ]
 
         SetMilestone issue milestone ->
             case model.accessToken of
@@ -909,73 +892,51 @@ update msg model =
                     model ! []
 
         MilestoneSet m result ->
-            { model | lockedIssueNumber = "" }
-                ! (case model.accessToken of
-                    Just token ->
-                        [ fetchMilestoneIssues model OpenIssue m
-                        , fetchIssues model Icebox
+            { model | lockedIssueNumber = "" } !
+                [ fetchMilestoneIssues model OpenIssue m
+                , fetchIssues model Icebox
+                ]
+
+
+        IssueRestarted m result ->
+            { model | lockedIssueNumber = "" } !
+                case m of
+                    Just milestone ->
+                        [ fetchMilestoneIssues model ClosedIssue milestone
+                        , fetchIssues model Current
                         ]
 
                     Nothing ->
-                        []
-                  )
-
-        IssueRestarted m result ->
-            { model | lockedIssueNumber = "" }
-                ! (case model.accessToken of
-                    Just token ->
-                        case m of
-                            Just milestone ->
-                                [ fetchMilestoneIssues model ClosedIssue milestone
-                                , fetchIssues model Current
-                                ]
-
-                            Nothing ->
-                                [ fetchIssues model Done
-                                , fetchIssues model Current
-                                ]
-
-                    Nothing ->
-                        []
-                  )
+                        [ fetchIssues model Done
+                        , fetchIssues model Current
+                        ]
 
         IssueStarted milestone result ->
-            { model | lockedIssueNumber = "" }
-                ! (case model.accessToken of
-                    Just token ->
-                        case milestone of
-                            Just m ->
-                                [ fetchMilestoneIssues model OpenIssue m
-                                , fetchIssues model Current
-                                ]
-
-                            Nothing ->
-                                [ fetchIssues model Current
-                                , fetchIssues model Icebox
-                                ]
+            { model | lockedIssueNumber = "" } !
+                case milestone of
+                    Just m ->
+                        [ fetchMilestoneIssues model OpenIssue m
+                        , fetchIssues model Current
+                        ]
 
                     Nothing ->
-                        []
-                  )
+                        [ fetchIssues model Current
+                        , fetchIssues model Icebox
+                        ]
+
 
         IssueFinished m result ->
-            { model | lockedIssueNumber = "" }
-                ! (case model.accessToken of
-                    Just token ->
-                        case m of
-                            Just m ->
-                                [ fetchMilestoneIssues model ClosedIssue m
-                                , fetchIssues model Current
-                                ]
-
-                            Nothing ->
-                                [ fetchIssues model Current
-                                , fetchIssues model Done
-                                ]
+            { model | lockedIssueNumber = "" } !
+                case m of
+                    Just m ->
+                        [ fetchMilestoneIssues model ClosedIssue m
+                        , fetchIssues model Current
+                        ]
 
                     Nothing ->
-                        []
-                  )
+                        [ fetchIssues model Current
+                        , fetchIssues model Done
+                        ]
 
         DismissPlanningIssue ->
             { model | pickMilestoneForIssue = Nothing } ! []
