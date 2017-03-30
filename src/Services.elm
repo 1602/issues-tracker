@@ -48,14 +48,14 @@ createMilestone repo title accessToken =
             |> Http.send MilestoneCreated
 
 
-createIssue : String -> String -> Encode.Value -> (Result Error Issue -> a) -> Cmd a
+createIssue : String -> Maybe String -> Encode.Value -> (Result Error Issue -> a) -> Cmd a
 createIssue repo accessToken data onComplete =
     Http.request
         { method = "POST"
         , headers = []
         , url =
             "https://api.github.com/repos/" ++ repo ++ "/issues"
-            ++ "?access_token=" ++ accessToken
+            ++ "?access_token=" ++ (Maybe.withDefault "" accessToken)
         , expect = Http.expectJson <| issueDecoder
         , body = Http.jsonBody data
         , timeout = Nothing

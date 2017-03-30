@@ -31,7 +31,7 @@ import Json.Decode as Decode
 -- APP
 
 
-main : Program (PersistedData, String) Model Msg
+main : Program ( PersistedData, String ) Model Msg
 main =
     programWithFlags UrlChange
         { init = init
@@ -66,8 +66,8 @@ extractRepo hash =
 -- MODEL
 
 
-init : (PersistedData, String) -> Location -> ( Model, Cmd Msg )
-init (persistentData, version) location =
+init : ( PersistedData, String ) -> Location -> ( Model, Cmd Msg )
+init ( persistentData, version ) location =
     let
         page =
             parseHash location
@@ -151,7 +151,8 @@ init (persistentData, version) location =
                     Nothing
                 else
                     Just settings.defaultRepository
-            else -- last visited
+            else
+                -- last visited
                 List.head recentRepos
     in
         model
@@ -210,6 +211,7 @@ loadAllIssues model =
     , fetchIssues model Done
     , fetchMilestones model
     ]
+
 
 loadResource : Model -> List (Cmd Msg)
 loadResource model =
@@ -302,6 +304,7 @@ focus loc =
         _ ->
             Cmd.none
 
+
 updateSettings : SettingsMsg -> Settings -> Settings
 updateSettings msg settings =
     case msg of
@@ -337,9 +340,10 @@ update msg model =
                 Ok cachedData ->
                     case cachedData of
                         CachedData url etag res ->
-                            update (msg res) { model
-                                | etags = Dict.insert url etag model.etags
-                            }
+                            update (msg res)
+                                { model
+                                    | etags = Dict.insert url etag model.etags
+                                }
 
                         NotModified ->
                             model ! []
@@ -354,6 +358,7 @@ update msg model =
                                 model ! []
                             else
                                 { model | error = toString e |> Just } ! []
+
                         _ ->
                             { model | error = toString e |> Just } ! []
 
@@ -444,76 +449,71 @@ update msg model =
             { model | newIssueTitle = s } ! []
 
         CreateStory col ->
-            case model.accessToken of
-                Just token ->
-                    { model | newIssueTitle = "" }
-                        ! (if model.newIssueTitle /= "" then
-                            [ setFocus "create-story"
-                            , createIssue model.repo
-                                token
-                                ([ ( "title", Encode.string model.newIssueTitle )
-                                 , ( "body", Encode.string "" )
-                                 , ( "labels"
-                                   , Encode.list <|
-                                        (case col of
-                                            Backlog ->
-                                                case model.addIssueToMilestone of
-                                                    "" ->
-                                                        [ Encode.string "Status: Ready" ]
-
-                                                    _ ->
-                                                        []
-
-                                            Current ->
-                                                [ Encode.string "Status: In Progress" ]
+            let
+                encodedIssue =
+                    Encode.object
+                        [ ( "title", Encode.string model.newIssueTitle )
+                        , ( "body", Encode.string "" )
+                        , ( "labels"
+                          , Encode.list <|
+                                (case col of
+                                    Backlog ->
+                                        case model.addIssueToMilestone of
+                                            "" ->
+                                                [ Encode.string "Status: Ready" ]
 
                                             _ ->
                                                 []
-                                        )
-                                   )
-                                 , ( "milestone"
-                                   , case model.addIssueToMilestone of
-                                        "" ->
-                                            Encode.null
-                                                |> Debug.log "create without milestone"
 
-                                        _ ->
-                                            model.addIssueToMilestone
-                                                |> Debug.log "create within milestone"
-                                                |> String.toInt
-                                                |> Result.withDefault 0
-                                                |> Encode.int
-                                   )
-                                 , ( "assignees"
-                                   , case col of
-                                        Current ->
-                                            case model.user of
-                                                Just user ->
-                                                    Encode.list [ Encode.string user.login ]
+                                    Current ->
+                                        [ Encode.string "Status: In Progress" ]
 
-                                                Nothing ->
-                                                    Encode.list []
-
-                                        _ ->
-                                            Encode.list []
-                                   )
-                                 ]
-                                    |> Encode.object
+                                    _ ->
+                                        []
                                 )
-                                (StoryCreated col
-                                    (model.milestones
-                                        |> Maybe.withDefault Dict.empty
-                                        |> Dict.get model.addIssueToMilestone
-                                        |> Maybe.andThen (\ms -> Just ms.milestone)
-                                    )
-                                )
-                            ]
-                           else
-                            []
                           )
+                        , ( "milestone"
+                          , case model.addIssueToMilestone of
+                                "" ->
+                                    Encode.null
 
-                Nothing ->
-                    model ! []
+                                _ ->
+                                    model.addIssueToMilestone
+                                        |> String.toInt
+                                        |> Result.withDefault 0
+                                        |> Encode.int
+                          )
+                        , ( "assignees"
+                          , case col of
+                                Current ->
+                                    case model.user of
+                                        Just user ->
+                                            Encode.list [ Encode.string user.login ]
+
+                                        Nothing ->
+                                            Encode.list []
+
+                                _ ->
+                                    Encode.list []
+                          )
+                        ]
+
+                milestone =
+                    model.milestones
+                        |> Maybe.withDefault Dict.empty
+                        |> Dict.get model.addIssueToMilestone
+                        |> Maybe.andThen (\ms -> Just ms.milestone)
+
+                cmd =
+                    if model.newIssueTitle /= "" then
+                        [ setFocus "create-story"
+                        , StoryCreated col milestone
+                            |> createIssue model.repo model.accessToken encodedIssue
+                        ]
+                    else
+                        []
+            in
+                { model | newIssueTitle = "" } ! cmd
 
         StoryCreated col milestone result ->
             case result of
@@ -617,11 +617,11 @@ update msg model =
                     if (Maybe.withDefault "" <| List.head model.recentRepos) == repo then
                         model.recentRepos
                     else
-                        repo :: (
-                            model.recentRepos
-                                |> List.filter ((/=) repo)
-                                |> List.take 19
-                        )
+                        repo
+                            :: (model.recentRepos
+                                    |> List.filter ((/=) repo)
+                                    |> List.take 19
+                               )
 
                 updatedModel =
                     ({ model
@@ -640,8 +640,8 @@ update msg model =
             let
                 issues =
                     Decode.decodeString (Decode.list issueDecoder) issuesJson
-                    |> Result.toMaybe
-                    |> Maybe.withDefault []
+                        |> Result.toMaybe
+                        |> Maybe.withDefault []
 
                 updatedModel =
                     { model
@@ -749,16 +749,17 @@ update msg model =
                                 if (Maybe.withDefault "" <| List.head model.recentRepos) == model.repo then
                                     model.recentRepos
                                 else
-                                    model.repo :: (
-                                        model.recentRepos
-                                            |> List.filter ((/=) model.repo)
-                                            |> List.take 19
-                                    )
+                                    model.repo
+                                        :: (model.recentRepos
+                                                |> List.filter ((/=) model.repo)
+                                                |> List.take 19
+                                           )
 
                             updatedMilestones =
                                 milestones
-                                    |> List.filter (\ms ->
-                                        not model.settings.powerOfNow || (ms.dueOn /= Nothing)
+                                    |> List.filter
+                                        (\ms ->
+                                            not model.settings.powerOfNow || (ms.dueOn /= Nothing)
                                         )
                                     |> List.foldl
                                         (\ms ->
@@ -794,21 +795,21 @@ update msg model =
                                 }
                         in
                             updatedModel
-                            ! (case model.accessToken of
-                                Just token ->
-                                    (updateLocalStorage updatedModel) ::
-                                    (milestones
-                                        |> List.filter (\ms -> ms.openIssues > 0)
-                                        |> List.map (fetchMilestoneIssues model OpenIssue)
-                                    )
-                                        ++ (milestones
-                                                |> List.filter (\ms -> ms.closedIssues > 0)
-                                                |> List.map (fetchMilestoneIssues model ClosedIssue)
-                                           )
+                                ! (case model.accessToken of
+                                    Just token ->
+                                        (updateLocalStorage updatedModel)
+                                            :: (milestones
+                                                    |> List.filter (\ms -> ms.openIssues > 0)
+                                                    |> List.map (fetchMilestoneIssues model OpenIssue)
+                                               )
+                                            ++ (milestones
+                                                    |> List.filter (\ms -> ms.closedIssues > 0)
+                                                    |> List.map (fetchMilestoneIssues model ClosedIssue)
+                                               )
 
-                                Nothing ->
-                                    []
-                              )
+                                    Nothing ->
+                                        []
+                                  )
 
         MilestoneCreated result ->
             case result of
@@ -824,8 +825,8 @@ update msg model =
             let
                 issues =
                     Decode.decodeString (Decode.list issueDecoder) issuesJson
-                    |> Result.toMaybe
-                    |> Maybe.withDefault []
+                        |> Result.toMaybe
+                        |> Maybe.withDefault []
             in
                 case column of
                     Current ->
@@ -855,15 +856,14 @@ update msg model =
                     _ ->
                         model ! []
 
-
         CopyText str ->
             model ! [ clipboard str ]
 
         UnsetMilestone m result ->
-            { model | lockedIssueNumber = "" } !
-                [ fetchMilestoneIssues model OpenIssue m
-                , fetchIssues model Icebox
-                ]
+            { model | lockedIssueNumber = "" }
+                ! [ fetchMilestoneIssues model OpenIssue m
+                  , fetchIssues model Icebox
+                  ]
 
         SetMilestone issue milestone ->
             case model.accessToken of
@@ -892,15 +892,14 @@ update msg model =
                     model ! []
 
         MilestoneSet m result ->
-            { model | lockedIssueNumber = "" } !
-                [ fetchMilestoneIssues model OpenIssue m
-                , fetchIssues model Icebox
-                ]
-
+            { model | lockedIssueNumber = "" }
+                ! [ fetchMilestoneIssues model OpenIssue m
+                  , fetchIssues model Icebox
+                  ]
 
         IssueRestarted m result ->
-            { model | lockedIssueNumber = "" } !
-                case m of
+            { model | lockedIssueNumber = "" }
+                ! case m of
                     Just milestone ->
                         [ fetchMilestoneIssues model ClosedIssue milestone
                         , fetchIssues model Current
@@ -912,8 +911,8 @@ update msg model =
                         ]
 
         IssueStarted milestone result ->
-            { model | lockedIssueNumber = "" } !
-                case milestone of
+            { model | lockedIssueNumber = "" }
+                ! case milestone of
                     Just m ->
                         [ fetchMilestoneIssues model OpenIssue m
                         , fetchIssues model Current
@@ -924,10 +923,9 @@ update msg model =
                         , fetchIssues model Icebox
                         ]
 
-
         IssueFinished m result ->
-            { model | lockedIssueNumber = "" } !
-                case m of
+            { model | lockedIssueNumber = "" }
+                ! case m of
                     Just m ->
                         [ fetchMilestoneIssues model ClosedIssue m
                         , fetchIssues model Current
@@ -950,7 +948,8 @@ update msg model =
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
-                                                |> updateIssueWith model.repo issue.number
+                                                |> updateIssueWith model.repo
+                                                    issue.number
                                                     (Encode.object [ ( "milestone", Encode.null ) ])
                                                     token
                                           ]
@@ -1038,13 +1037,13 @@ update msg model =
                                                     |> List.filter ((/=) "Status: Ready")
                                                     |> List.filter ((/=) "Status: In Progress")
                                                     |> (\labels ->
-                                                        case issue.milestone of
-                                                            Nothing ->
-                                                                "Status: Ready" :: labels
+                                                            case issue.milestone of
+                                                                Nothing ->
+                                                                    "Status: Ready" :: labels
 
-                                                            Just _ ->
-                                                                labels
-                                                        )
+                                                                Just _ ->
+                                                                    labels
+                                                       )
                                                     |> List.map Encode.string
                                                     |> Encode.list
                                               )
@@ -1569,12 +1568,10 @@ viewSettings model =
         option value current =
             Html.option [ Attrs.selected <| value == current ] [ text value ]
 
-
         settingsBlock title contents =
-            div [ style [ ("background", "#333"), ( "border", "1px solid #555"), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
+            div [ style [ ( "background", "#333" ), ( "border", "1px solid #555" ), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
     in
-        div [ style [("padding", "10px")]]
-
+        div [ style [ ( "padding", "10px" ) ] ]
             -- default repo
             [ settingsBlock "Default repository"
                 [ Html.select [ onInput ChangeDefaultRepositoryType ]
@@ -1583,13 +1580,11 @@ viewSettings model =
                     ]
                 , if model.settings.defaultRepositoryType == "specified" then
                     Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
-                else
+                  else
                     text ""
                 , Html.p [] [ text "this setting controls repository which will be opened when visiting the kanban app" ]
                 ]
-
-
-            -- limit
+              -- limit
             , settingsBlock "Limit for 'We just did it'"
                 [ Html.select [ onInput ChangeDoneLimit ]
                     [ option "a day" model.settings.doneLimit
@@ -1599,19 +1594,22 @@ viewSettings model =
                     ]
                 , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
                 ]
-
-
-            -- focused mode: ignore milestones with no due date
+              -- focused mode: ignore milestones with no due date
             , settingsBlock "Focus on present, ignore ideas"
-                [ Html.label [] [ Html.input [ Attrs.checked model.settings.powerOfNow, Attrs.type_ "checkbox", onClick IgnoreIdeas ] []
-                , text " ignore milestones with no due date"
-                ]
+                [ Html.label []
+                    [ Html.input [ Attrs.checked model.settings.powerOfNow, Attrs.type_ "checkbox", onClick IgnoreIdeas ] []
+                    , text " ignore milestones with no due date"
+                    ]
                 , Html.p []
-                    [ text <| (if model.settings.powerOfNow then "keep this box ticked" else "tick this box")
+                    [ text <|
+                        (if model.settings.powerOfNow then
+                            "keep this box ticked"
+                         else
+                            "tick this box"
+                        )
                     , text " if you don't want to be bothered by the things that will not happen in the nearest future"
                     ]
                 ]
-
             , settingsBlock "App Version"
                 [ Html.strong [] [ text model.version ]
                 , Html.p [] [ text "this app is in active development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and possibly grab some new bugs at the same time, sorry), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
@@ -1631,16 +1629,17 @@ listIssuesWithinMilestones milestones issueState now model =
             -- pin to the top
             if ems.milestone.number == pinnedMilestoneNumber then
                 0
-            else case ems.milestone.dueOn of
-                -- milestones without due date go to the bottom
-                Nothing ->
-                    1 / 0
+            else
+                case ems.milestone.dueOn of
+                    -- milestones without due date go to the bottom
+                    Nothing ->
+                        1 / 0
 
-                -- order milestones by closest due date
-                Just date ->
-                    date
-                        |> Date.toTime
-                        |> Time.inSeconds
+                    -- order milestones by closest due date
+                    Just date ->
+                        date
+                            |> Date.toTime
+                            |> Time.inSeconds
 
         renderMilestoneWithIssues expandedMilestone =
             let
@@ -1770,6 +1769,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                     )
                     Nothing
                 |> Maybe.withDefault "idea"
+
         getTypeIcon issue =
             issue.labels
                 |> List.foldl
@@ -2128,7 +2128,7 @@ reopeningColumnButton col showColumns list =
     if List.member col showColumns then
         list
     else
-        (Html.button [ style (buttonStyle |> List.filter (\(s,_) -> s /= "margin-top")), onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
+        (Html.button [ style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")), onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
 
 
 viewLink : String -> Html msg -> Location -> Html msg
@@ -2175,7 +2175,7 @@ viewLink src childNode location =
                 , ( "font-weight", "700" )
                 , ( "background", color )
                 , ( "color", "black" )
-                -- , ( "height", "30px" )
+                  -- , ( "height", "30px" )
                 ]
             ]
             [ link ]
