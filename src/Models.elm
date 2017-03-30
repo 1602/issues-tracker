@@ -16,7 +16,7 @@ type Column
     | Done
 
 
-type IssueState = IssueOpen | IssueClosed
+type IssueState = OpenIssue | ClosedIssue
 
 type alias Model =
     { settings : Settings

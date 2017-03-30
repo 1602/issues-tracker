@@ -567,7 +567,7 @@ update msg model =
                                         Backlog ->
                                             case milestone of
                                                 Just ms ->
-                                                    fetchMilestoneIssues model IssueOpen ms
+                                                    fetchMilestoneIssues model OpenIssue ms
 
                                                 Nothing ->
                                                     fetchIssues model Icebox
@@ -697,7 +697,7 @@ update msg model =
                                             case s of
                                                 Just ms ->
                                                     case issueState of
-                                                        IssueOpen ->
+                                                        OpenIssue ->
                                                             let
                                                                 m =
                                                                     ms.milestone
@@ -711,7 +711,7 @@ update msg model =
                                                                         , milestone = updatedMilestone
                                                                     }
 
-                                                        IssueClosed ->
+                                                        ClosedIssue ->
                                                             let
                                                                 m =
                                                                     ms.milestone
@@ -743,7 +743,7 @@ update msg model =
                     List.foldl
                         (\ms res ->
                             case issueState of
-                                IssueClosed ->
+                                ClosedIssue ->
                                     case ms.closedIssues of
                                         Nothing ->
                                             if ms.milestone.closedIssues > 0 then
@@ -754,7 +754,7 @@ update msg model =
                                         Just _ ->
                                             res + 1
 
-                                IssueOpen ->
+                                OpenIssue ->
                                     case ms.openIssues of
                                         Nothing ->
                                             if ms.milestone.openIssues > 0 then
@@ -843,11 +843,11 @@ update msg model =
                                     (updateLocalStorage updatedModel) ::
                                     (milestones
                                         |> List.filter (\ms -> ms.openIssues > 0)
-                                        |> List.map (fetchMilestoneIssues model IssueOpen)
+                                        |> List.map (fetchMilestoneIssues model OpenIssue)
                                     )
                                         ++ (milestones
                                                 |> List.filter (\ms -> ms.closedIssues > 0)
-                                                |> List.map (fetchMilestoneIssues model IssueClosed)
+                                                |> List.map (fetchMilestoneIssues model ClosedIssue)
                                            )
 
                                 Nothing ->
@@ -907,7 +907,7 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model IssueOpen m
+                        [ fetchMilestoneIssues model OpenIssue m
                         , fetchIssues model Icebox
                         ]
 
@@ -945,7 +945,7 @@ update msg model =
             { model | lockedIssueNumber = "" }
                 ! (case model.accessToken of
                     Just token ->
-                        [ fetchMilestoneIssues model IssueOpen m
+                        [ fetchMilestoneIssues model OpenIssue m
                         , fetchIssues model Icebox
                         ]
 
@@ -959,7 +959,7 @@ update msg model =
                     Just token ->
                         case m of
                             Just milestone ->
-                                [ fetchMilestoneIssues model IssueClosed milestone
+                                [ fetchMilestoneIssues model ClosedIssue milestone
                                 , fetchIssues model Current
                                 ]
 
@@ -978,7 +978,7 @@ update msg model =
                     Just token ->
                         case milestone of
                             Just m ->
-                                [ fetchMilestoneIssues model IssueOpen m
+                                [ fetchMilestoneIssues model OpenIssue m
                                 , fetchIssues model Current
                                 ]
 
@@ -997,7 +997,7 @@ update msg model =
                     Just token ->
                         case m of
                             Just m ->
-                                [ fetchMilestoneIssues model IssueClosed m
+                                [ fetchMilestoneIssues model ClosedIssue m
                                 , fetchIssues model Current
                                 ]
 
@@ -1312,7 +1312,7 @@ viewPage user model route =
                             List.foldl
                                 (\ms res ->
                                     case issueState of
-                                        IssueClosed ->
+                                        ClosedIssue ->
                                             case ms.closedIssues of
                                                 Nothing ->
                                                     if ms.milestone.closedIssues > 0 then
@@ -1323,7 +1323,7 @@ viewPage user model route =
                                                 Just _ ->
                                                     res + 1
 
-                                        IssueOpen ->
+                                        OpenIssue ->
                                             case ms.openIssues of
                                                 Nothing ->
                                                     if ms.milestone.openIssues > 0 then
@@ -1573,7 +1573,7 @@ viewPage user model route =
                             )
                         |> Maybe.andThen
                             (\htmlNode ->
-                                case displayIssuesWithinMilestones model.milestones IssueOpen of
+                                case displayIssuesWithinMilestones model.milestones OpenIssue of
                                     Just html ->
                                         div [] [ htmlNode, html ] |> Just
 
@@ -1606,7 +1606,7 @@ viewPage user model route =
                             )
                         |> Maybe.andThen
                             (\htmlNode ->
-                                case displayIssuesWithinMilestones model.milestones IssueClosed of
+                                case displayIssuesWithinMilestones model.milestones ClosedIssue of
                                     Just html ->
                                         div [] [ htmlNode, html ] |> Just
 
@@ -1684,114 +1684,119 @@ viewSettings model =
                     ]
                 ]
 
-            , settingsBlock "Version"
+            , settingsBlock "App Version"
                 [ Html.strong [] [ text model.version ]
-                , Html.p [] [ text "this app is in development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and grab some new bugs at the same time), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
+                , Html.p [] [ text "this app is in active development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and possibly grab some new bugs at the same time, sorry), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
                 ]
             ]
 
 
 listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Model -> Html Msg
 listIssuesWithinMilestones milestones issueState now model =
-    milestones
-        |> Dict.values
-        |> List.sortBy
-            (\ems ->
-                -- pin to the top
-                if ems.milestone.number == (Maybe.withDefault "" <| Dict.get model.repo model.pinnedMilestones) then
-                    0
-                else
-                    case ems.milestone.dueOn of
-                        -- milestones without due date go to the bottom
+    let
+        pinnedMilestoneNumber =
+            model.pinnedMilestones
+                |> Dict.get model.repo
+                |> Maybe.withDefault ""
+
+        milestoneSortingRule ems =
+            -- pin to the top
+            if ems.milestone.number == pinnedMilestoneNumber then
+                0
+            else case ems.milestone.dueOn of
+                -- milestones without due date go to the bottom
+                Nothing ->
+                    1 / 0
+
+                -- order milestones by closest due date
+                Just date ->
+                    date
+                        |> Date.toTime
+                        |> Time.inSeconds
+
+        renderMilestoneWithIssues expandedMilestone =
+            let
+                hasIssues =
+                    case issueState of
+                        OpenIssue ->
+                            expandedMilestone.milestone.openIssues > 0
+
+                        ClosedIssue ->
+                            expandedMilestone.milestone.closedIssues > 0
+
+                displayIssuesOrLoading head issues =
+                    case issues of
+                        Just issues ->
+                            case issueState of
+                                OpenIssue ->
+                                    listIssues
+                                        head
+                                        True
+                                        (List.filter (hasNoLabel "Status: In Progress") issues)
+                                        Backlog
+                                        model
+                                        Backlog
+                                        expandedMilestone.milestone.number
+
+                                ClosedIssue ->
+                                    listIssues
+                                        head
+                                        True
+                                        issues
+                                        Done
+                                        model
+                                        Done
+                                        expandedMilestone.milestone.number
+
                         Nothing ->
-                            1 / 0
+                            span [ cellStyle "calc(100% - 8px)" ] [ text "Loading" ]
 
-                        -- order milestones by closest due date
-                        Just date ->
-                            date
-                                |> Date.toTime
-                                |> Time.inSeconds
-            )
-        |> List.map
-            (\expandedMilestone ->
-                let
-                    hasIssues =
-                        case issueState of
-                            IssueOpen ->
-                                expandedMilestone.milestone.openIssues > 0
+                issues head =
+                    case issueState of
+                        OpenIssue ->
+                            displayIssuesOrLoading head expandedMilestone.openIssues
 
-                            IssueClosed ->
-                                expandedMilestone.milestone.closedIssues > 0
+                        ClosedIssue ->
+                            displayIssuesOrLoading head expandedMilestone.closedIssues
 
-                    displayIssuesOrLoading head issues =
-                        case issues of
-                            Just issues ->
-                                case issueState of
-                                    IssueOpen ->
-                                        listIssues
-                                            head
-                                            True
-                                            (List.filter (hasNoLabel "Status: In Progress") issues)
-                                            Backlog
-                                            model
-                                            Backlog
-                                            expandedMilestone.milestone.number
+                heading =
+                    ( if expandedMilestone.milestone.number == pinnedMilestoneNumber then
+                        Just "📌"
+                      else
+                        Just "🏁"
+                      -- , Html.a [ Attrs.target "_blank", Attrs.href expandedMilestone.milestone.htmlUrl ] [ text <| expandedMilestone.milestone.title ++ " " ]
+                    , Html.span
+                        [ Attrs.tabindex 10
+                        , Attrs.class "no-outline"
+                        , Attrs.id <| "milestone-" ++ expandedMilestone.milestone.number
+                        , onClick <| PinMilestone expandedMilestone.milestone.number
+                        , style [ ( "cursor", "pointer" ) ]
+                        ]
+                        [ text <|
+                            expandedMilestone.milestone.title
+                                ++ (case expandedMilestone.milestone.dueOn of
+                                        Just date ->
+                                            if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
+                                                " overdue"
+                                            else
+                                                " due in " ++ (Distance.inWords now date)
 
-                                    IssueClosed ->
-                                        listIssues
-                                            head
-                                            True
-                                            issues
-                                            Done
-                                            model
-                                            Done
-                                            expandedMilestone.milestone.number
-
-                            Nothing ->
-                                span [ cellStyle "calc(100% - 8px)" ] [ text "Loading" ]
-
-                    issues head =
-                        case issueState of
-                            IssueOpen ->
-                                displayIssuesOrLoading head expandedMilestone.openIssues
-
-                            IssueClosed ->
-                                displayIssuesOrLoading head expandedMilestone.closedIssues
-
-                    heading =
-                        ( if expandedMilestone.milestone.number == (Maybe.withDefault "" <| Dict.get model.repo model.pinnedMilestones) then
-                            Just "📌"
-                          else
-                            Just "🏁"
-                          -- , Html.a [ Attrs.target "_blank", Attrs.href expandedMilestone.milestone.htmlUrl ] [ text <| expandedMilestone.milestone.title ++ " " ]
-                        , Html.span
-                            [ Attrs.tabindex 10
-                            , Attrs.class "no-outline"
-                            , Attrs.id <| "milestone-" ++ expandedMilestone.milestone.number
-                            , onClick <| PinMilestone expandedMilestone.milestone.number
-                            , style [ ( "cursor", "pointer" ) ]
-                            ]
-                            [ text <|
-                                expandedMilestone.milestone.title
-                                    ++ (case expandedMilestone.milestone.dueOn of
-                                            Just date ->
-                                                if (Date.toTime date |> Time.inSeconds) < (Date.toTime now |> Time.inSeconds) then
-                                                    " overdue"
-                                                else
-                                                    " due in " ++ (Distance.inWords now date)
-
-                                            Nothing ->
-                                                " (no due date)"
-                                       )
-                            ]
-                        )
-                in
-                    if hasIssues || True then
-                        issues heading
-                    else
-                        text ""
-            )
-        |> div []
+                                        Nothing ->
+                                            " (no due date)"
+                                   )
+                        ]
+                    )
+            in
+                if hasIssues || True then
+                    issues heading
+                else
+                    text ""
+    in
+        milestones
+            |> Dict.values
+            |> List.sortBy milestoneSortingRule
+            |> List.map renderMilestoneWithIssues
+            |> div []
 
 
 buttonStyle : List ( String, String )

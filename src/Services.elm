@@ -78,10 +78,10 @@ fetchMilestoneIssues model issueState ms =
 
         state =
             case issueState of
-                IssueOpen ->
+                OpenIssue ->
                     "&state=open"
 
-                IssueClosed ->
+                ClosedIssue ->
                     "&state=closed"
 
         filterByUser =
@@ -107,7 +107,7 @@ fetchMilestoneIssues model issueState ms =
 
         since =
             case issueState of
-                IssueClosed ->
+                ClosedIssue ->
                     case model.settings.doneLimit of
                         "a day" ->
                             pastMoment -1 Day
@@ -123,7 +123,7 @@ fetchMilestoneIssues model issueState ms =
 
                         _ ->
                             ""
-                IssueOpen ->
+                OpenIssue ->
                     ""
         url =
             "https://api.github.com/repos/"
