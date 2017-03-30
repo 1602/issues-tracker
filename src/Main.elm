@@ -308,6 +308,21 @@ focus loc =
         _ ->
             Cmd.none
 
+updateSettings : SettingsMsg -> Settings -> Settings
+updateSettings msg settings =
+    case msg of
+        IgnoreIdeas ->
+            { settings | powerOfNow = not settings.powerOfNow }
+
+        ChangeDoneLimit s ->
+            { settings | doneLimit = s }
+
+        UpdateDefaultRepository s ->
+            { settings | defaultRepository = s }
+
+        ChangeDefaultRepositoryType s ->
+            { settings | defaultRepositoryType = s }
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -316,15 +331,12 @@ update msg model =
         NoOp ->
             model ! []
 
-        IgnoreIdeas ->
+        SettingsMsgProxy msg ->
             let
-                s =
-                    model.settings
-
-                updatedSettings =
-                    { s | powerOfNow = not s.powerOfNow }
+                updatedModel =
+                    { model | settings = updateSettings msg model.settings }
             in
-                { model | settings = updatedSettings } ! []
+                updatedModel ! [ updateLocalStorage updatedModel ]
 
         FetchComplete msg result ->
             case result of
@@ -350,51 +362,6 @@ update msg model =
                                 { model | error = toString e |> Just } ! []
                         _ ->
                             { model | error = toString e |> Just } ! []
-
-        ChangeDoneLimit s ->
-            let
-                settings =
-                    model.settings
-
-                updatedSettings =
-                    { settings
-                        | doneLimit = s
-                    }
-
-                updatedModel =
-                    { model | settings = updatedSettings }
-            in
-                updatedModel ! [ updateLocalStorage updatedModel ]
-
-        UpdateDefaultRepository s ->
-            let
-                settings =
-                    model.settings
-
-                updatedSettings =
-                    { settings
-                        | defaultRepository = s
-                    }
-
-                updatedModel =
-                    { model | settings = updatedSettings }
-            in
-                updatedModel ! [ updateLocalStorage updatedModel ]
-
-        ChangeDefaultRepositoryType s ->
-            let
-                settings =
-                    model.settings
-
-                updatedSettings =
-                    { settings
-                        | defaultRepositoryType = s
-                    }
-
-                updatedModel =
-                    { model | settings = updatedSettings }
-            in
-                updatedModel ! [ updateLocalStorage updatedModel ]
 
         FilterStories s ->
             { model | filterStoriesBy = s } ! []
@@ -1632,10 +1599,10 @@ viewPage user model route =
                         milestonesIndex
 
                     Settings user repo ->
-                        viewSettings model
+                        Html.map SettingsMsgProxy <| viewSettings model
 
 
-viewSettings : Model -> Html Msg
+viewSettings : Model -> Html SettingsMsg
 viewSettings model =
     let
         option value current =

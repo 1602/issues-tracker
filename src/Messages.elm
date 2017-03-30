@@ -42,9 +42,11 @@ type Msg
     | ReopenColumn Column
     | PinMilestone String
     | FilterStories String
-    | ChangeDefaultRepositoryType String
+    | FetchComplete (String -> Msg) (Result Error CachedData)
+    | SettingsMsgProxy SettingsMsg
+
+type SettingsMsg
+    = ChangeDefaultRepositoryType String
     | UpdateDefaultRepository String
     | ChangeDoneLimit String
     | IgnoreIdeas
-    | FetchComplete (String -> Msg) (Result Error CachedData)
-
