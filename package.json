@@ -2,7 +2,7 @@
   "name": "github-kanban",
   "description": "Kanban board built from GH issues",
   "version": "0.11.0",
-  "license": "MIT",
+  "license": "BSD",
   "author": "Anatoliy Chakkaev",
   "repository": {
     "type": "git",
