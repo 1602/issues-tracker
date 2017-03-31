@@ -1412,18 +1412,7 @@ viewPage user model route =
         column col content =
             let
                 ( icon, title, comment ) =
-                    case col of
-                        Icebox ->
-                            ( "❄", "Icebox", "(keep this place empty)" )
-
-                        Backlog ->
-                            ( "🚥", "Backlog", "(plan all the things via milestones)" )
-
-                        Current ->
-                            ( "🐝", "In progress", "(issues with status 'In Progress')" )
-
-                        Done ->
-                            ( "🎉", "Done", "(closed issues)" )
+                    columnTitle col
             in
                 if List.member col model.showColumns then
                     Html.section
@@ -1576,6 +1565,21 @@ viewPage user model route =
                     Settings user repo ->
                         Html.map SettingsMsgProxy <| viewSettings model
 
+
+columnTitle : Column -> ( String, String, String )
+columnTitle col =
+    case col of
+        Icebox ->
+            ( "❄", "Icebox", "(keep this place empty)" )
+
+        Backlog ->
+            ( "🚥", "Backlog", "(plan all the things via milestones)" )
+
+        Current ->
+            ( "🐝", "In progress", "(issues with status 'In Progress')" )
+
+        Done ->
+            ( "🎉", "Done", "(closed issues)" )
 
 viewSettings : Model -> Html SettingsMsg
 viewSettings model =
@@ -2139,10 +2143,13 @@ viewTopbar user model =
 
 reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
 reopeningColumnButton col showColumns list =
-    if List.member col showColumns then
-        list
-    else
-        (Html.button [ style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")), onClick <| ReopenColumn col ] [ text <| toString col ]) :: list
+    let
+        (icon, title, _) = columnTitle col
+    in
+        if List.member col showColumns then
+            list
+        else
+            (Html.button [ style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")), onClick <| ReopenColumn col ] [ text <| icon ++ " " ++ title ]) :: list
 
 
 viewLink : String -> Html msg -> Location -> Html msg
