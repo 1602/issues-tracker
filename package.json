@@ -1,12 +1,12 @@
 {
-  "name": "elm-webpack-starter",
-  "description": "Webpack setup for writing Elm apps",
+  "name": "github-kanban",
+  "description": "Kanban board built from GH issues",
   "version": "0.11.0",
   "license": "MIT",
-  "author": "Peter Morawiec",
+  "author": "Anatoliy Chakkaev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/moarwick/elm-webpack-starter"
+    "url": "https://github.com/1602/issues-tracker"
   },
   "scripts": {
     "start": "webpack-dev-server --hot --inline --content-base src/ --port 8088",
