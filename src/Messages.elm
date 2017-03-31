@@ -9,12 +9,12 @@ import Navigation exposing (Location)
 
 type Msg
     = NoOp
-    | LoadMilestones String
-    | MilestoneIssuesLoaded String IssueState String
+    | LoadMilestones (Maybe String)
+    | MilestoneIssuesLoaded String IssueState (Maybe String)
     | CurrentDate Date.Date
     | CurrentTime Time.Time
     | UrlChange Location
-    | IssuesLoaded Column String
+    | IssuesLoaded Column (Maybe String)
     | UnsetMilestone Milestone (Result Error Issue)
     | SetMilestone Issue Milestone
     | MilestoneSet Milestone (Result Error Issue)
@@ -42,8 +42,9 @@ type Msg
     | ReopenColumn Column
     | PinMilestone String
     | FilterStories String
-    | FetchComplete (String -> Msg) (Result Error CachedData)
+    | FetchComplete (Maybe String -> Msg) (Result Error CachedData)
     | SettingsMsgProxy SettingsMsg
+    | CheckVersion (Maybe String)
 
 type SettingsMsg
     = ChangeDefaultRepositoryType String

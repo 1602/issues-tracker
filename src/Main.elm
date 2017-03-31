@@ -340,22 +340,22 @@ update msg model =
                 Ok cachedData ->
                     case cachedData of
                         CachedData url etag res ->
-                            update (msg res)
+                            update (msg (Just res))
                                 { model
                                     | etags = Dict.insert url etag model.etags
                                 }
 
                         NotModified ->
-                            model ! []
+                            update (msg Nothing) model
 
                         NotCached res ->
-                            update (msg res) model
+                            update (msg (Just res)) model
 
                 Err e ->
                     case e of
                         BadStatus res ->
                             if res.status.code == 304 then
-                                model ! []
+                                update (msg Nothing) model
                             else
                                 { model | error = toString e |> Just } ! []
 
@@ -578,7 +578,14 @@ update msg model =
             { model | now = now } ! []
 
         CurrentTime now ->
-            { model | now = Date.fromTime now } ! loadAllIssues model
+            { model | now = Date.fromTime now } ! ((checkVersion model.etags) :: loadAllIssues model)
+
+        CheckVersion packageJson ->
+            let
+                a =
+                    Debug.log "package" packageJson
+            in
+                model ! []
 
         SelectStory issue ->
             case parseHash model.location of
@@ -638,54 +645,60 @@ update msg model =
 
         MilestoneIssuesLoaded num issueState issuesJson ->
             let
-                issues =
-                    Decode.decodeString (Decode.list issueDecoder) issuesJson
+                issues json =
+                    Decode.decodeString (Decode.list issueDecoder) json
                         |> Result.toMaybe
                         |> Maybe.withDefault []
 
+                updateMilestoneIssues issues s =
+                    case s of
+                        Just ms ->
+                            case issueState of
+                                OpenIssue ->
+                                    let
+                                        m =
+                                            ms.milestone
+
+                                        updatedMilestone =
+                                            { m | openIssues = List.length issues }
+                                    in
+                                        Just
+                                            { ms
+                                                | openIssues = Just issues
+                                                , milestone = updatedMilestone
+                                            }
+
+                                ClosedIssue ->
+                                    let
+                                        m =
+                                            ms.milestone
+
+                                        updatedMilestone =
+                                            { m | closedIssues = List.length issues }
+                                    in
+                                        Just
+                                            { ms
+                                                | closedIssues = Just issues
+                                                , milestone = updatedMilestone
+                                            }
+
+                        Nothing ->
+                            Nothing
+
+
                 updatedModel =
-                    { model
-                        | milestones =
-                            Just
-                                (Maybe.withDefault Dict.empty model.milestones
-                                    |> Dict.update num
-                                        (\s ->
-                                            case s of
-                                                Just ms ->
-                                                    case issueState of
-                                                        OpenIssue ->
-                                                            let
-                                                                m =
-                                                                    ms.milestone
-
-                                                                updatedMilestone =
-                                                                    { m | openIssues = List.length issues }
-                                                            in
-                                                                Just
-                                                                    { ms
-                                                                        | openIssues = Just issues
-                                                                        , milestone = updatedMilestone
-                                                                    }
-
-                                                        ClosedIssue ->
-                                                            let
-                                                                m =
-                                                                    ms.milestone
-
-                                                                updatedMilestone =
-                                                                    { m | closedIssues = List.length issues }
-                                                            in
-                                                                Just
-                                                                    { ms
-                                                                        | closedIssues = Just issues
-                                                                        , milestone = m
-                                                                    }
-
-                                                Nothing ->
-                                                    Nothing
+                    case issuesJson of
+                        Just json ->
+                            { model
+                                | milestones =
+                                    Just
+                                        (Maybe.withDefault Dict.empty model.milestones
+                                            |> Dict.update num (updateMilestoneIssues <| issues json)
                                         )
-                                )
-                    }
+                            }
+
+                        Nothing ->
+                            model
 
                 mss =
                     case updatedModel.milestones of
@@ -737,7 +750,9 @@ update msg model =
         LoadMilestones milestonesJson ->
             let
                 result =
-                    Decode.decodeString (Decode.list milestoneDecoder) milestonesJson
+                    milestonesJson
+                        |> Maybe.withDefault "[]"
+                        |> Decode.decodeString (Decode.list milestoneDecoder)
             in
                 case result of
                     Err error ->
@@ -798,11 +813,15 @@ update msg model =
                                 ! (case model.accessToken of
                                     Just token ->
                                         (updateLocalStorage updatedModel)
-                                            :: (milestones
+                                            :: (updatedMilestones
+                                                    |> Dict.values
+                                                    |> List.map .milestone
                                                     |> List.filter (\ms -> ms.openIssues > 0)
                                                     |> List.map (fetchMilestoneIssues model OpenIssue)
                                                )
-                                            ++ (milestones
+                                            ++ (updatedMilestones
+                                                    |> Dict.values
+                                                    |> List.map .milestone
                                                     |> List.filter (\ms -> ms.closedIssues > 0)
                                                     |> List.map (fetchMilestoneIssues model ClosedIssue)
                                                )
@@ -823,37 +842,40 @@ update msg model =
 
         IssuesLoaded column issuesJson ->
             let
-                issues =
-                    Decode.decodeString (Decode.list issueDecoder) issuesJson
+                issues json =
+                    Decode.decodeString (Decode.list issueDecoder) json
                         |> Result.toMaybe
-                        |> Maybe.withDefault []
             in
-                case column of
-                    Current ->
-                        { model | currentIssues = Just issues, error = Nothing }
-                            ! (if model.needFocus then
-                                [ focus model.location ]
-                               else
-                                []
-                              )
+                case issuesJson of
+                    Just json ->
+                        case column of
+                            Current ->
+                                { model | currentIssues = issues json, error = Nothing }
+                                    ! (if model.needFocus then
+                                        [ focus model.location ]
+                                       else
+                                        []
+                                      )
 
-                    Icebox ->
-                        { model | iceboxIssues = Just issues, error = Nothing }
-                            ! (if model.needFocus then
-                                [ focus model.location ]
-                               else
-                                []
-                              )
+                            Icebox ->
+                                { model | iceboxIssues = issues json, error = Nothing }
+                                    ! (if model.needFocus then
+                                        [ focus model.location ]
+                                       else
+                                        []
+                                      )
 
-                    Done ->
-                        { model | closedIssues = Just issues, error = Nothing }
-                            ! (if model.needFocus then
-                                [ focus model.location ]
-                               else
-                                []
-                              )
+                            Done ->
+                                { model | closedIssues = issues json, error = Nothing }
+                                    ! (if model.needFocus then
+                                        [ focus model.location ]
+                                       else
+                                        []
+                                      )
 
-                    _ ->
+                            _ ->
+                                model ! []
+                    Nothing ->
                         model ! []
 
         CopyText str ->
@@ -1120,7 +1142,7 @@ save result model fn =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Time.every (60 * Time.second) CurrentTime
+        [ Time.every (10 * Time.second) CurrentTime
         ]
 
 

@@ -245,7 +245,7 @@ fetchIssues model column =
             (IssuesLoaded column)
 
 
-cachingFetch : String -> Dict.Dict String String -> (String -> Msg) -> Cmd Msg
+cachingFetch : String -> Dict.Dict String String -> (Maybe String -> Msg) -> Cmd Msg
 cachingFetch url etags oncomplete =
     Http.request
         { method = "GET"
@@ -261,7 +261,7 @@ cachingFetch url etags oncomplete =
             if res.status.code == 304 then
                 Ok NotModified
             else
-                case Dict.get "ETag" res.headers of
+                case res.headers |> Debug.log ("headers " ++ url) |> Dict.toList |> List.filterMap (\(key, val) -> if "etag" == (String.toLower key) then Just val else Nothing) |> List.head of
                     Just etag ->
                         Ok <| CachedData url etag res.body
 
@@ -387,3 +387,11 @@ fetchUser accessToken =
         , withCredentials = False
         }
             |> Http.send LoadUser
+
+
+checkVersion : Dict.Dict String String -> Cmd Msg
+checkVersion etags =
+    cachingFetch
+        "https://raw.githubusercontent.com/1602/issues-tracker/master/package.json"
+        etags
+        CheckVersion
