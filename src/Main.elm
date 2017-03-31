@@ -1411,19 +1411,19 @@ viewPage user model route =
 
         column col content =
             let
-                ( title, comment ) =
+                ( icon, title, comment ) =
                     case col of
                         Icebox ->
-                            ( "❄ Icebox", "(keep this place empty)" )
+                            ( "❄", "Icebox", "(keep this place empty)" )
 
                         Backlog ->
-                            ( "🚥 Backlog", "(plan all the things via milestones)" )
+                            ( "🚥", "Backlog", "(plan all the things via milestones)" )
 
                         Current ->
-                            ( "🐝 In progress", "(issues with status 'In Progress')" )
+                            ( "🐝", "In progress", "(issues with status 'In Progress')" )
 
                         Done ->
-                            ( "🎉 Done", "(closed issues)" )
+                            ( "🎉", "Done", "(closed issues)" )
             in
                 if List.member col model.showColumns then
                     Html.section
@@ -1447,7 +1447,7 @@ viewPage user model route =
                             ]
                         ]
                         [ Html.h3 [ style [ ( "position", "relative" ) ] ]
-                            [ text <| title ++ " "
+                            [ text <| icon ++ " " ++ title ++ " "
                             , Html.small [] [ text comment ]
                             , span
                                 [ style
@@ -1749,7 +1749,6 @@ buttonStyle =
     , ( "background", "#eee" )
     , ( "color", "#222" )
     , ( "cursor", "pointer" )
-      -- , ( "line-height", "30px" )
     , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
     , ( "border-radius", "1px" )
     , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
