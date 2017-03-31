@@ -578,14 +578,7 @@ update msg model =
             { model | now = now } ! []
 
         CurrentTime now ->
-            { model | now = Date.fromTime now } ! ((checkVersion model.etags) :: loadAllIssues model)
-
-        CheckVersion packageJson ->
-            let
-                a =
-                    Debug.log "package" packageJson
-            in
-                model ! []
+            { model | now = Date.fromTime now } ! loadAllIssues model
 
         SelectStory issue ->
             case parseHash model.location of
@@ -1950,7 +1943,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                         list
                )
             |> (\list ->
-                    if List.isEmpty list then
+                    if List.isEmpty list && model.filterStoriesBy /= "" then
                         []
                     else
                         [ div

@@ -44,7 +44,6 @@ type Msg
     | FilterStories String
     | FetchComplete (Maybe String -> Msg) (Result Error CachedData)
     | SettingsMsgProxy SettingsMsg
-    | CheckVersion (Maybe String)
 
 type SettingsMsg
     = ChangeDefaultRepositoryType String

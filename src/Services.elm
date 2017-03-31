@@ -255,7 +255,7 @@ cachingFetch url etags oncomplete =
                     [ Http.header "If-None-Match" etag ]
 
                 Nothing ->
-                    []
+                    [ ]
         , url = url
         , expect = Http.expectStringResponse (\res ->
             if res.status.code == 304 then
@@ -388,10 +388,3 @@ fetchUser accessToken =
         }
             |> Http.send LoadUser
 
-
-checkVersion : Dict.Dict String String -> Cmd Msg
-checkVersion etags =
-    cachingFetch
-        "https://raw.githubusercontent.com/1602/issues-tracker/master/package.json"
-        etags
-        CheckVersion

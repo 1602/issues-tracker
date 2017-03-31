@@ -9,7 +9,7 @@
     "url": "https://github.com/1602/issues-tracker"
   },
   "scripts": {
-    "start": "webpack-dev-server --hot --inline --content-base src/ --port 8088",
+    "start": "webpack-dev-server --https --hot --inline --content-base src/ --port 8088",
     "build": "rimraf dist && webpack",
     "deploy": "gh-pages -d dist -a"
   },
