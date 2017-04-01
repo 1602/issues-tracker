@@ -98,6 +98,9 @@ init ( persistentData, version ) location =
                             "Icebox" ->
                                 Icebox
 
+                            "Search" ->
+                                Search
+
                             _ ->
                                 Backlog
                     )
@@ -1209,7 +1212,7 @@ view model =
     in
         case model.user of
             Just user ->
-                div []
+                div [ style [ ( "display", "flex" ) ] ]
                     [ viewTopbar user model
                     , viewPage user model <| parseHash model.location
                     , error
@@ -1469,8 +1472,8 @@ viewPage user model route =
             Html.main_
                 [ style
                     [ ( "display", "flex" )
-                    , ( "width", "100%" )
-                    , ( "height", "calc(100vh - 42px)" )
+                    , ( "height", "100vh" )
+                    , ( "width", "calc(100% - 42px)" )
                     ]
                 ]
                 [ column Icebox
@@ -1545,6 +1548,7 @@ viewPage user model route =
                                         Nothing
                             )
                     )
+                , column Search (Just <| span [ cellExStyle [] ] [ text "Coming soon..." ])
                 ]
     in
         case route of
@@ -1569,6 +1573,9 @@ viewPage user model route =
 columnTitle : Column -> ( String, String, String )
 columnTitle col =
     case col of
+        Search ->
+            ( "🔎", "Search", "" )
+
         Icebox ->
             ( "❄", "Icebox", "(keep this place empty)" )
 
@@ -1897,6 +1904,9 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                                 text ""
                             , div [ Attrs.class "buttons" ] <|
                                 case col of
+                                    Search ->
+                                        [ ]
+
                                     Backlog ->
                                         [ button issue "unplan", button issue "start" ]
 
@@ -2079,19 +2089,20 @@ textareaStyle =
 
 viewTopbar : User -> Model -> Html Msg
 viewTopbar user model =
-    div [ style [ ( "line-height", "28px" ), ( "height", "41px" ) ] ]
+    div [ style [ ( "height", "100%" ), ( "width", "41px" ), ( "padding", "5px" ) ] ]
         [ div
             [ style
                 [ ( "position", "absolute" )
-                , ( "right", "0px" )
+                , ( "bottom", "0px" )
                 , ( "vertical-align", "middle" )
                 ]
             ]
-            [ Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ] [ text user.login ]
-            , img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
+            [ Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ] [
+             img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
             ]
-        , [ viewLink "stories" (text "Stories")
-          , viewLink "milestones" (text "Milestones")
+            ]
+        , [ viewLink "stories" (text "🔬")
+          , viewLink "milestones" (text "🔭")
           ]
             |> List.map (\s -> s model.location)
             |> Html.ul
@@ -2100,8 +2111,10 @@ viewTopbar user model =
                     , ( "display", "inline-block" )
                     , ( "margin", "0" )
                     , ( "padding", "0" )
+                    , ( "margin-bottom", "20px" )
                     ]
                 ]
+                {-
         , text " Show stories: "
         , Html.select
             [ onInput ChangeFilter
@@ -2125,19 +2138,22 @@ viewTopbar user model =
             , Html.option [] [ text "created by me" ]
             , Html.option [] [ text "mentioning me" ]
             ]
+            --}
         , []
             |> reopeningColumnButton Done model.showColumns
             |> reopeningColumnButton Current model.showColumns
             |> reopeningColumnButton Backlog model.showColumns
             |> reopeningColumnButton Icebox model.showColumns
+            |> reopeningColumnButton Search model.showColumns
             |> (\list ->
                     if List.isEmpty list then
                         text ""
                     else
-                        span [] <| (text " Reopen column: ") :: list
+                        --span [] <| (text " Reopen column: ") :: list
+                        span [] list
                )
-        , text " Filter stories: "
-        , Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
+        --, text " Filter stories: "
+        --, Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
         ]
 
 
@@ -2147,9 +2163,16 @@ reopeningColumnButton col showColumns list =
         (icon, title, _) = columnTitle col
     in
         if List.member col showColumns then
-            list
+            (Html.button [
+                style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")
+                |> (++) [ ( "font-size", "18px" ), ("height", "30px" ), ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| HideColumn col ] [ text <| icon ]) :: list
         else
-            (Html.button [ style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")), onClick <| ReopenColumn col ] [ text <| icon ++ " " ++ title ]) :: list
+            (Html.button [
+                style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top" && s /= "background" )
+                |> (++) [ ( "font-size", "18px" ), ( "background", "#444" )
+
+            , ( "filter", "grayscale(0.9) " )
+               , ("height", "30px" ), ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| ReopenColumn col ] [ text <| icon ]) :: list
 
 
 viewLink : String -> Html msg -> Location -> Html msg
@@ -2189,13 +2212,17 @@ viewLink src childNode location =
         Html.li
             [ style
                 [ ( "list-style", "none" )
-                , ( "display", "inline-block" )
-                , ( "padding", "5px" )
+                , ( "display", "block" )
+                , ( "padding", "0px" )
                 , ( "margin", "0" )
                 , ( "margin-bottom", "10px" )
                 , ( "font-weight", "700" )
                 , ( "background", color )
                 , ( "color", "black" )
+                , ( "font-size", "20px" )
+                , ( "width", "30px" )
+                , ( "height", "30px" )
+                , ( "text-align", "center" )
                   -- , ( "height", "30px" )
                 ]
             ]

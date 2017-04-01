@@ -14,6 +14,7 @@ type Column
     | Backlog
     | Icebox
     | Done
+    | Search
 
 
 type IssueState = OpenIssue | ClosedIssue

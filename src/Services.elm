@@ -169,6 +169,9 @@ fetchIssues model column =
                 Icebox ->
                     ""
 
+                Search ->
+                    ""
+
                 Backlog ->
                     "&labels=Status: Ready"
 
