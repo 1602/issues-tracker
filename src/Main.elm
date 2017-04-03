@@ -1030,7 +1030,7 @@ update msg model =
                                         (IssueFinished issue.milestone)
                                   ]
 
-                        "reopen" ->
+                        "restart" ->
                             { model | lockedIssueNumber = issue.number }
                                 ! [ updateIssueWith model.repo
                                         issue.number
@@ -1933,7 +1933,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                                         ]
 
                                     Done ->
-                                        [ button issue "reopen" ]
+                                        [ button issue "restart" ]
                             ]
                         ]
                 )
