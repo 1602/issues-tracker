@@ -72,6 +72,8 @@ init ( persistentData, version ) location =
         page =
             parseHash location
 
+        a = Debug.log "persistent data" persistentData
+
         highlightStory =
             case page of
                 Just (Story _ _ s) ->
@@ -565,7 +567,12 @@ update msg model =
                         updatedModel ! (loadResource updatedModel)
 
                 Err e ->
-                    { model | error = Just (toString e), accessToken = Nothing, user = Nothing } ! []
+                    case e of
+                        NetworkError ->
+                            { model | error = Just (toString e) } ![]
+
+                        _ ->
+                            { model | error = Just (toString e), accessToken = Nothing, user = Nothing } ! []
 
         SaveAccessToken ->
             let
@@ -1210,40 +1217,32 @@ view model =
                 , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
                 ]
     in
-        case model.user of
-            Just user ->
-                div [ style [ ( "display", "flex" ) ] ]
-                    [ viewTopbar user model
-                    , viewPage user model <| parseHash model.location
-                    , error
-                    , model.pickMilestoneForIssue
-                        |> Maybe.andThen (pickMilestoneModal >> Just)
-                        |> Maybe.withDefault (text "")
-                    ]
-
-            Nothing ->
-                case model.accessToken of
-                    Nothing ->
-                        case model.error of
-                            Just err ->
-                                div [] [ text err ]
-
-                            Nothing ->
-                                div []
-                                    [ text "cheers. visit "
-                                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
-                                    , text " (we need 'repo' access granted to see all private repositories)"
-                                    , Html.br [] []
-                                    , text "and fill this input "
-                                    , Html.input [ onInput EditAccessToken ] []
-                                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
-                                    ]
-
+        div [ style [ ( "display", "flex" ) ] ]
+            <|
+                [ viewNavigation model.user model
+                , viewPage model.user model <| parseHash model.location
+                , error
+                , model.pickMilestoneForIssue
+                    |> Maybe.andThen (pickMilestoneModal >> Just)
+                    |> Maybe.withDefault (text "")
+                , case model.accessToken of
                     Just _ ->
-                        div [] [ text "Bear with me. I'm currently loading user information..." ]
+                        text ""
+
+                    Nothing ->
+                        div [] [ text "cheers. visit "
+                        , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
+                        , text " (we need 'repo' access granted to see all private repositories)"
+                        , Html.br [] []
+                        , text "and fill this input "
+                        , Html.input [ onInput EditAccessToken ] []
+                        , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
+                        ]
+                ]
 
 
-viewPage : User -> Model -> Maybe Route -> Html Msg
+
+viewPage : Maybe User -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
     let
         displayIssuesWithinMilestones milestones issueState =
@@ -1423,19 +1422,20 @@ viewPage user model route =
                             [ ( "width"
                               , case List.length model.showColumns of
                                     3 ->
-                                        "33.33%"
+                                        "calc(33.33% - 5px)"
 
                                     2 ->
-                                        "50%"
+                                        "calc(50% - 5px)"
 
                                     1 ->
-                                        "100%"
+                                        "calc(100% - 5px)"
 
                                     _ ->
-                                        "25%"
+                                        "calc(25% - 5px)"
                               )
                             , ( "padding-right", "0px" )
                             , ( "padding-left", "3px" )
+                            , ( "flex-shrink", "0" )
                             ]
                         ]
                         [ Html.h3 [ style [ ( "position", "relative" ) ] ]
@@ -1448,7 +1448,8 @@ viewPage user model route =
                                     , ( "top", "10px" )
                                     , ( "width", "20px" )
                                     , ( "height", "20px" )
-                                    , ( "background", "#111" )
+                                    , ( "background", "#eee" )
+                                    , ( "color", "#222" )
                                     , ( "line-height", "20px" )
                                     , ( "text-align", "center" )
                                     , ( "cursor", "pointer" )
@@ -1474,9 +1475,11 @@ viewPage user model route =
                     [ ( "display", "flex" )
                     , ( "height", "100vh" )
                     , ( "width", "calc(100% - 42px)" )
+                    , ( "overflow-x", "scroll" )
                     ]
                 ]
-                [ column Icebox
+                [ column Search (Just <| span [ cellExStyle [] ] [ text "Coming soon..." ])
+                , column Icebox
                     (model.iceboxIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1548,7 +1551,6 @@ viewPage user model route =
                                         Nothing
                             )
                     )
-                , column Search (Just <| span [ cellExStyle [] ] [ text "Coming soon..." ])
                 ]
     in
         case route of
@@ -2087,9 +2089,9 @@ textareaStyle =
         ]
 
 
-viewTopbar : User -> Model -> Html Msg
-viewTopbar user model =
-    div [ style [ ( "height", "100%" ), ( "width", "41px" ), ( "padding", "5px" ) ] ]
+viewNavigation : Maybe User -> Model -> Html Msg
+viewNavigation user model =
+    div [ style [ ( "height", "100vh" ), ( "width", "41px" ), ( "background-color", "#1d1d1d" ), ( "padding", "5px" ) ] ]
         [ div
             [ style
                 [ ( "position", "absolute" )
@@ -2097,8 +2099,12 @@ viewTopbar user model =
                 , ( "vertical-align", "middle" )
                 ]
             ]
-            [ Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ] [
-             img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
+            [ case user of
+                Nothing ->
+                    text ""
+                Just user ->
+                    Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ] [
+                 img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
             ]
             ]
         , [ viewLink "stories" (text "🔬")
@@ -2168,11 +2174,15 @@ reopeningColumnButton col showColumns list =
                 |> (++) [ ( "font-size", "18px" ), ("height", "30px" ), ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| HideColumn col ] [ text <| icon ]) :: list
         else
             (Html.button [
-                style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top" && s /= "background" )
-                |> (++) [ ( "font-size", "18px" ), ( "background", "#444" )
-
-            , ( "filter", "grayscale(0.9) " )
-               , ("height", "30px" ), ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| ReopenColumn col ] [ text <| icon ]) :: list
+                style (buttonStyle |> List.filter (\( s, _ ) ->
+                    s /= "margin-top" && s /= "background" && s /= "color" )
+                |> (++)
+                    [ ( "font-size", "18px" )
+                    , ( "background", "rgba(40,40,40,1)" )
+                    , ( "color", "#bbb" )
+                    , ( "filter", "grayscale(0.9) " )
+                    , ( "height", "30px" )
+                    , ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| ReopenColumn col ] [ text <| icon ]) :: list
 
 
 viewLink : String -> Html msg -> Location -> Html msg
