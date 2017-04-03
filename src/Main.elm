@@ -1600,7 +1600,7 @@ viewSettings model =
         settingsBlock title contents =
             div [ style [ ( "background", "#333" ), ( "border", "1px solid #555" ), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
     in
-        div [ style [ ( "padding", "10px" ) ] ]
+        Html.main_ [ style [ ( "padding", "10px" ), ( "overflow-y", "auto" ), ( "height", "100vh" ), ( "width", "100vw") ] ]
             -- default repo
             [ settingsBlock "Default repository"
                 [ Html.select [ onInput ChangeDefaultRepositoryType ]
@@ -2092,76 +2092,149 @@ textareaStyle =
 
 viewNavigation : Maybe User -> Model -> Html Msg
 viewNavigation user model =
-    div [ style [ ( "height", "100vh" ), ( "width", "41px" ), ( "background-color", "#1d1d1d" ), ( "padding", "5px" ) ] ]
-        [ div
-            [ style
-                [ ( "position", "absolute" )
-                , ( "bottom", "0px" )
-                , ( "vertical-align", "middle" )
-                ]
-            ]
-            [ case user of
-                Nothing ->
+    let
+        issuesSubnav =
+            []
+                |> reopeningColumnButton Done model.showColumns
+                |> reopeningColumnButton Current model.showColumns
+                |> reopeningColumnButton Backlog model.showColumns
+                |> reopeningColumnButton Icebox model.showColumns
+                |> reopeningColumnButton Search model.showColumns
+                |> div []
+
+        activePage =
+            parseHash model.location
+
+        isSettingsActive =
+            case activePage of
+                Just (Settings _ _) ->
+                    True
+
+                _ ->
+                    False
+
+        subNav =
+            case activePage of
+                Just (Story _ _ _) ->
+                    issuesSubnav
+
+                Just (IssuesIndex _ _) ->
+                    issuesSubnav
+                _ ->
                     text ""
-                Just user ->
-                    Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ] [
-                 img [ src user.avatar, Attrs.width 24, style [ ( "vertical-align", "middle" ), ( "margin", "5px" ) ] ] []
-            ]
-            ]
-        , [ viewLink "stories" (text "🔬")
-          , viewLink "milestones" (text "🔭")
-          ]
-            |> List.map (\s -> s model.location)
-            |> Html.ul
+
+        menuListItemStyle isActive =
+            style
+                [ ( "list-style", "none" )
+                , ( "display", "block" )
+                , ( "padding", "0px" )
+                , ( "margin", "0" )
+                , ( "margin-bottom", "10px" )
+                , ( "font-weight", "700" )
+                , ( "background", if isActive then "rgb(246,246,247)" else "rgba(255,255,255, 0.1)" )
+                , ( "color", "black" )
+                , ( "font-size", "20px" )
+                , ( "width", "30px" )
+                , ( "height", "30px" )
+                , ( "text-align", "center" )
+                  -- , ( "height", "30px" )
+                ]
+
+        viewLink src childNode location =
+            let
+                repo =
+                    location.hash
+                        |> String.split "/"
+                        |> List.drop 1
+                        |> List.take 2
+                        |> String.join "/"
+
+                isActive =
+                    location.hash
+                        |> String.split "/"
+                        |> List.drop 3
+                        |> String.join "/"
+                        |> String.startsWith src
+
+                url =
+                    "#/" ++ repo ++ "/" ++ src
+
+                link =
+                    if isActive then
+                        childNode
+                    else
+                        Html.a
+                            [ Attrs.href url ]
+                            [ childNode ]
+            in
+                Html.li [ menuListItemStyle isActive ] [ link ]
+    in
+        div [ style [ ( "height", "100vh" ), ( "width", "41px" ), ( "background-color", "#1d1d1d" ), ( "padding", "5px" ) ] ]
+            [ Html.ul
                 [ style
-                    [ ( "list-style", "none" )
-                    , ( "display", "inline-block" )
+                    [ ( "position", "absolute" )
+                    , ( "bottom", "0px" )
+                    , ( "vertical-align", "middle" )
                     , ( "margin", "0" )
                     , ( "padding", "0" )
-                    , ( "margin-bottom", "20px" )
                     ]
                 ]
-                {-
-        , text " Show stories: "
-        , Html.select
-            [ onInput ChangeFilter
-            , Attrs.value
-                (case model.filter of
-                    AssignedTo _ ->
-                        "assigned to me"
-
-                    CreatedBy _ ->
-                        "created by me"
-
-                    HasMentionOf _ ->
-                        "mentioning me"
-
-                    All ->
-                        "all"
-                )
-            ]
-            [ Html.option [] [ text "all" ]
-            , Html.option [] [ text "assigned to me" ]
-            , Html.option [] [ text "created by me" ]
-            , Html.option [] [ text "mentioning me" ]
-            ]
-            --}
-        , []
-            |> reopeningColumnButton Done model.showColumns
-            |> reopeningColumnButton Current model.showColumns
-            |> reopeningColumnButton Backlog model.showColumns
-            |> reopeningColumnButton Icebox model.showColumns
-            |> reopeningColumnButton Search model.showColumns
-            |> (\list ->
-                    if List.isEmpty list then
+                [ case user of
+                    Nothing ->
                         text ""
-                    else
-                        --span [] <| (text " Reopen column: ") :: list
-                        span [] list
-               )
-        --, text " Filter stories: "
-        --, Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
-        ]
+                    Just user ->
+                        Html.li [ menuListItemStyle isSettingsActive ] [
+                            Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ]
+                                [ img
+                                    [ src user.avatar
+                                    , Attrs.width 24
+                                    , style [ ( "vertical-align", "middle" ) ]
+                                    ] []
+                     ]
+                ]
+                ]
+            , [ viewLink "stories" (text "🔬")
+              , viewLink "milestones" (text "🔭")
+              ]
+                |> List.map (\s -> s model.location)
+                |> Html.ul
+                    [ style
+                        [ ( "list-style", "none" )
+                        , ( "display", "inline-block" )
+                        , ( "margin", "0" )
+                        , ( "padding", "0" )
+                        , ( "margin-bottom", "20px" )
+                        ]
+                    ]
+                    {-
+            , text " Show stories: "
+            , Html.select
+                [ onInput ChangeFilter
+                , Attrs.value
+                    (case model.filter of
+                        AssignedTo _ ->
+                            "assigned to me"
+
+                        CreatedBy _ ->
+                            "created by me"
+
+                        HasMentionOf _ ->
+                            "mentioning me"
+
+                        All ->
+                            "all"
+                    )
+                ]
+                [ Html.option [] [ text "all" ]
+                , Html.option [] [ text "assigned to me" ]
+                , Html.option [] [ text "created by me" ]
+                , Html.option [] [ text "mentioning me" ]
+                ]
+                --}
+            , subNav
+            --, text " Filter stories: "
+            --, Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
+            ]
 
 
 reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
@@ -2186,55 +2259,3 @@ reopeningColumnButton col showColumns list =
                     , ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| ReopenColumn col ] [ text <| icon ]) :: list
 
 
-viewLink : String -> Html msg -> Location -> Html msg
-viewLink src childNode location =
-    let
-        repo =
-            location.hash
-                |> String.split "/"
-                |> List.drop 1
-                |> List.take 2
-                |> String.join "/"
-
-        isActive =
-            location.hash
-                |> String.split "/"
-                |> List.drop 3
-                |> String.join "/"
-                |> String.startsWith src
-
-        color =
-            if isActive then
-                "rgb(246,246,247)"
-            else
-                "rgba(255,255,255, 0.1)"
-
-        url =
-            "#/" ++ repo ++ "/" ++ src
-
-        link =
-            if isActive then
-                childNode
-            else
-                Html.a
-                    [ Attrs.href url ]
-                    [ childNode ]
-    in
-        Html.li
-            [ style
-                [ ( "list-style", "none" )
-                , ( "display", "block" )
-                , ( "padding", "0px" )
-                , ( "margin", "0" )
-                , ( "margin-bottom", "10px" )
-                , ( "font-weight", "700" )
-                , ( "background", color )
-                , ( "color", "black" )
-                , ( "font-size", "20px" )
-                , ( "width", "30px" )
-                , ( "height", "30px" )
-                , ( "text-align", "center" )
-                  -- , ( "height", "30px" )
-                ]
-            ]
-            [ link ]
