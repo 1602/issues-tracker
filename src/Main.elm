@@ -17,10 +17,10 @@ import Date.Distance as Distance
 import Html.Attributes as Attrs exposing (style, class, attribute, src)
 import Html.Events exposing (onClick, onInput)
 import Json.Encode as Encode
-import Markdown
 import Dom
 import Date.Extra
 import Json.Decode as Decode
+import GithubMarkdown exposing (ghMd)
 
 
 -- import Base exposing (..)
@@ -1886,7 +1886,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                                 )
                             , if issue.number == model.highlightStory then
                                 div []
-                                    [ Html.p [] [ Markdown.toHtml [] issue.description ]
+                                    [ Html.p [] [ ghMd model.repo issue.description ]
                                     , Html.p []
                                         [ text "created by "
                                         , text issue.creator.login
