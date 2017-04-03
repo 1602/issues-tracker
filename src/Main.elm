@@ -1475,7 +1475,8 @@ viewPage user model route =
                     [ ( "display", "flex" )
                     , ( "height", "100vh" )
                     , ( "width", "calc(100% - 42px)" )
-                    , ( "overflow-x", "scroll" )
+                    , ( "overflow-x", "auto" )
+                    , ( "overflow-y", "hidden" )
                     ]
                 ]
                 [ column Search (Just <| span [ cellExStyle [] ] [ text "Coming soon..." ])
