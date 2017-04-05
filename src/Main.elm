@@ -1148,7 +1148,7 @@ save result model fn =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Time.every (10 * Time.second) CurrentTime
+        [ Time.every (30 * Time.second) CurrentTime
         , navigateToIssue NavigateToIssue
         ]
 
