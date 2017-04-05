@@ -336,6 +336,11 @@ update msg model =
         NoOp ->
             model ! []
 
+        NavigateToIssue (repo, issueNumber) ->
+            model !
+                [ Navigation.modifyUrl <| "#/" ++ repo ++ "/stories/" ++ issueNumber ]
+
+
         SettingsMsgProxy msg ->
             let
                 updatedModel =
@@ -348,24 +353,29 @@ update msg model =
                 Ok cachedData ->
                     case cachedData of
                         CachedData url etag res ->
-                            update (msg (Just res))
+                            update (msg res)
                                 { model
-                                    | etags = Dict.insert url etag model.etags
+                                    | etags = Dict.insert url (etag, res) model.etags
                                 }
 
-                        NotModified ->
-                            update (msg Nothing) model
-
                         NotCached res ->
-                            update (msg (Just res)) model
+                            update (msg res) model
 
                 Err e ->
                     case e of
                         BadStatus res ->
-                            if res.status.code == 304 then
-                                update (msg Nothing) model
-                            else
-                                { model | error = toString e |> Just } ! []
+                            let
+                                (etag, body) =
+                                    case Dict.get res.url model.etags of
+                                        Just (etag, body) ->
+                                            (etag, body)
+                                        Nothing ->
+                                            ("", "")
+                            in
+                                if res.status.code == 304 && body /= "" then
+                                    update (msg body) model
+                                else
+                                    { model | error = toString e |> Just } ! []
 
                         _ ->
                             { model | error = toString e |> Just } ! []
@@ -693,18 +703,14 @@ update msg model =
 
 
                 updatedModel =
-                    case issuesJson of
-                        Just json ->
                             { model
                                 | milestones =
                                     Just
                                         (Maybe.withDefault Dict.empty model.milestones
-                                            |> Dict.update num (updateMilestoneIssues <| issues json)
+                                            |> Dict.update num (updateMilestoneIssues <| issues issuesJson)
                                         )
                             }
 
-                        Nothing ->
-                            model
 
                 mss =
                     case updatedModel.milestones of
@@ -757,7 +763,6 @@ update msg model =
             let
                 result =
                     milestonesJson
-                        |> Maybe.withDefault "[]"
                         |> Decode.decodeString (Decode.list milestoneDecoder)
             in
                 case result of
@@ -852,38 +857,33 @@ update msg model =
                     Decode.decodeString (Decode.list issueDecoder) json
                         |> Result.toMaybe
             in
-                case issuesJson of
-                    Just json ->
-                        case column of
-                            Current ->
-                                { model | currentIssues = issues json, error = Nothing }
-                                    ! (if model.needFocus then
-                                        [ focus model.location ]
-                                       else
-                                        []
-                                      )
+                case column of
+                    Current ->
+                        { model | currentIssues = issues issuesJson, error = Nothing }
+                            ! (if model.needFocus then
+                                [ focus model.location ]
+                               else
+                                []
+                              )
 
-                            Icebox ->
-                                { model | iceboxIssues = issues json, error = Nothing }
-                                    ! (if model.needFocus then
-                                        [ focus model.location ]
-                                       else
-                                        []
-                                      )
+                    Icebox ->
+                        { model | iceboxIssues = issues issuesJson, error = Nothing }
+                            ! (if model.needFocus then
+                                [ focus model.location ]
+                               else
+                                []
+                              )
 
-                            Done ->
-                                { model | closedIssues = issues json, error = Nothing }
-                                    ! (if model.needFocus then
-                                        [ focus model.location ]
-                                       else
-                                        []
-                                      )
+                    Done ->
+                        { model | closedIssues = issues issuesJson, error = Nothing }
+                            ! (if model.needFocus then
+                                [ focus model.location ]
+                               else
+                                []
+                              )
 
-                            _ ->
-                                model ! []
-                    Nothing ->
+                    _ ->
                         model ! []
-
         CopyText str ->
             model ! [ clipboard str ]
 
@@ -1149,6 +1149,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Time.every (10 * Time.second) CurrentTime
+        , navigateToIssue NavigateToIssue
         ]
 
 
@@ -2187,7 +2188,13 @@ viewNavigation user model =
                         text ""
                     Just user ->
                         Html.li [ menuListItemStyle isSettingsActive ] [
-                            Html.a [ Attrs.href <| "#/" ++ model.repo ++ "/settings" ]
+                            Html.a
+                                [ Attrs.href <| "#/" ++ model.repo ++ "/settings"
+                                , style
+                                    [ ( "display", "inline-block" )
+                                    , ( "vertical-align", "middle" )
+                                    ]
+                                ]
                                 [ img
                                     [ src user.avatar
                                     , Attrs.width 24

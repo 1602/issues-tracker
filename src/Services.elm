@@ -179,7 +179,8 @@ fetchIssues model column =
                     "&labels=Status: In Progress"
 
                 Done ->
-                    "&labels=Status: Completed"
+                    -- "&labels=Status: Completed"
+                    ""
 
         state =
             case column of
@@ -248,34 +249,52 @@ fetchIssues model column =
             (IssuesLoaded column)
 
 
-cachingFetch : String -> Dict.Dict String String -> (Maybe String -> Msg) -> Cmd Msg
+cachingFetch : String -> Dict.Dict String (String, String) -> (String -> Msg) -> Cmd Msg
 cachingFetch url etags oncomplete =
-    Http.request
-        { method = "GET"
-        , headers =
+    let
+        (etag, cachedBody) =
             case Dict.get url etags of
-                Just etag ->
-                    [ Http.header "If-None-Match" etag ]
+                Just (etag, body) ->
+                    (etag, body)
 
                 Nothing ->
-                    [ ]
-        , url = url
-        , expect = Http.expectStringResponse (\res ->
-            if res.status.code == 304 then
-                Ok NotModified
-            else
-                case res.headers |> Debug.log ("headers " ++ url) |> Dict.toList |> List.filterMap (\(key, val) -> if "etag" == (String.toLower key) then Just val else Nothing) |> List.head of
-                    Just etag ->
-                        Ok <| CachedData url etag res.body
+                    ("", "")
 
-                    Nothing ->
-                        Ok <| NotCached res.body
-            )
-        , body = Http.emptyBody
-        , timeout = Nothing
-        , withCredentials = False
-        }
-        |> Http.send (FetchComplete oncomplete)
+        extractEtag res =
+            res.headers
+                |> Dict.toList
+                |> List.filterMap (\(key, val) ->
+                    if "etag" == (String.toLower key) then
+                        Just val
+                    else
+                        Nothing
+                    )
+                |> List.head
+    in
+        Http.request
+            { method = "GET"
+            , headers =
+                if etag /= "" then
+                    [ Http.header "If-None-Match" etag ]
+                else
+                    [ ]
+            , url = url
+            , expect = Http.expectStringResponse (\res ->
+                if res.status.code == 304 then
+                    Ok <| CachedData res.url etag cachedBody
+                else
+                    case extractEtag res of
+                        Just etag ->
+                            Ok <| CachedData res.url etag res.body
+
+                        Nothing ->
+                            Ok <| NotCached res.body
+                )
+            , body = Http.emptyBody
+            , timeout = Nothing
+            , withCredentials = False
+            }
+            |> Http.send (FetchComplete oncomplete)
 
 
 updateIssueWith : String -> String -> Decode.Value -> String -> (Result Error Issue -> a) -> Cmd a

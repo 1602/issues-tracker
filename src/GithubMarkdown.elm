@@ -8,6 +8,7 @@ ghMd : String -> String -> Html.Html msg
 ghMd repo str =
     str
         |> replaceLinksWithIssues
+        |> replaceNamedLinksWithIssues
         |> replaceHashesWithLinks repo
         |> toHtml []
 
@@ -20,7 +21,7 @@ replaceHashesWithLinks repo =
         replaceHashWithLink match =
             case match.submatches of
                 (Just issue) :: [] ->
-                    " [#" ++ issue ++ "](https://github.com/" ++ repo ++ "/issues/" ++ issue ++ ")"
+                    " [#" ++ issue ++ "](#/" ++ repo ++ "/stories/" ++ issue ++ ")"
                 _ ->
                     match.match
     in
@@ -29,13 +30,14 @@ replaceHashesWithLinks repo =
             expr
             replaceHashWithLink
 
+
 replaceLinksWithIssues : String -> String
 replaceLinksWithIssues =
     let
         replaceLinkWithIssue match =
             case match.submatches of
                 (Just org) :: (Just repo) :: (Just issue) :: [] ->
-                    " [" ++ org ++ "/" ++ repo ++ "#" ++ issue ++ "](" ++ match.match ++ ")"
+                    " [" ++ org ++ "/" ++ repo ++ "#" ++ issue ++ "](#/" ++ org ++ "/" ++ repo ++ "/stories/" ++ issue ++ ")"
                 _ ->
                     match.match
 
@@ -46,3 +48,22 @@ replaceLinksWithIssues =
             All
             expr
             replaceLinkWithIssue
+
+
+replaceNamedLinksWithIssues : String -> String
+replaceNamedLinksWithIssues =
+    let
+        replaceNamedLinkWithIssue match =
+            case match.submatches of
+                (Just org) :: (Just repo) :: (Just issue) :: [] ->
+                    "(#/" ++ org ++ "/" ++ repo ++ "/stories/" ++ issue ++ ")"
+                _ ->
+                    match.match
+
+        expr =
+            regex "\\(\\s*https:\\/\\/github.com\\/(.+?)\\/(.+?)\\/issues\\/(\\d+)\\s*\\)"
+    in
+        replace
+            All
+            expr
+            replaceNamedLinkWithIssue

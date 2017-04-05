@@ -60,6 +60,7 @@ elm.ports.clipboard.subscribe(str => {
     copyTextToClipboard(str);
 });
 
+/*
 document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('click', (e) => {
         if (e.target && e.target.href && e.target.href.startsWith('https://github.com/')) {
@@ -72,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+*/
 
 
 // copy-n-paste from:
