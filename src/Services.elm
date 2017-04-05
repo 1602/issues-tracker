@@ -410,3 +410,15 @@ fetchUser accessToken =
         }
             |> Http.send LoadUser
 
+searchIssues : Model -> Cmd Msg
+searchIssues { repo, accessToken, searchTerms, etags } =
+    let
+        url =
+            "https://api.github.com/search/issues?access_token="
+                ++ (Maybe.withDefault "" accessToken)
+                ++ "&q=repo:" ++ repo ++ " " ++ searchTerms
+    in
+        cachingFetch
+            url
+            etags
+            IssuesSearchResults

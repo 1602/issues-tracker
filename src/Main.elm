@@ -149,6 +149,8 @@ init ( persistentData, version ) location =
                 ""
                 recentRepos
                 Dict.empty
+                ""
+                NotRequested
 
         defaultRepo =
             if settings.defaultRepositoryType == "specified" then
@@ -335,6 +337,27 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        IssuesSearchResults issuesJson ->
+            let
+                issues =
+                    Decode.decodeString (Decode.at [ "items" ] <| Decode.list issueDecoder) issuesJson
+
+                updatedModel =
+                    case issues of
+                        Ok issues ->
+                            { model | searchResults = Loaded issues }
+                        Err e ->
+                            { model | error = Just (toString e) }
+            in
+                updatedModel ! []
+
+        ChangeSearchTerms terms ->
+            { model | searchTerms = terms } ! []
+
+        SearchIssues ->
+            model !
+                [ searchIssues model ]
 
         NavigateToIssue (repo, issueNumber) ->
             model !
@@ -1415,7 +1438,7 @@ viewPage user model route =
                 Nothing ->
                     text "Loading..."
 
-        column col content =
+        column col colHtml content =
             let
                 ( icon, title, comment ) =
                     columnTitle col
@@ -1445,6 +1468,11 @@ viewPage user model route =
                         [ Html.h3 [ style [ ( "position", "relative" ) ] ]
                             [ text <| icon ++ " " ++ title ++ " "
                             , Html.small [] [ text comment ]
+                            , case colHtml of
+                                Just html ->
+                                    html
+                                Nothing ->
+                                    text ""
                             , span
                                 [ style
                                     [ ( "position", "absolute" )
@@ -1483,8 +1511,26 @@ viewPage user model route =
                     , ( "overflow-y", "hidden" )
                     ]
                 ]
-                [ column Search (Just <| span [ cellExStyle [] ] [ text "Coming soon..." ])
-                , column Icebox
+                [ column Search (
+                   Just <|
+                   Html.form [ style [ ("display", "inline-block" ), ("width","calc(100% - 128px)")], Html.Events.onSubmit SearchIssues ]
+                       [ Html.input [style [ ("background", "white" ), ("border-color", "cornflowerblue"), ("color", "royalblue" ), ( "width", "100%") , ("min-width", "40px") ], Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
+                       ]
+                    ) (Just <|
+                   case model.searchResults of
+                        NotRequested ->
+                            text ""
+
+                        Loading ->
+                            text "Loading..."
+
+                        Loaded issues ->
+                            displayIssuesGroupedByDate
+                                issues
+                                Icebox
+                                |> div []
+                )
+                , column Icebox Nothing
                     (model.iceboxIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1495,7 +1541,7 @@ viewPage user model route =
                                     |> Just
                             )
                     )
-                , column Backlog
+                , column Backlog Nothing
                     (model.iceboxIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1523,7 +1569,7 @@ viewPage user model route =
                                         Nothing
                             )
                     )
-                , column Current
+                , column Current Nothing
                     (model.currentIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1532,7 +1578,7 @@ viewPage user model route =
                                     |> Just
                             )
                     )
-                , column Done
+                , column Done Nothing
                     (model.closedIssues
                         |> Maybe.andThen
                             (\issues ->

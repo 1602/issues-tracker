@@ -45,6 +45,9 @@ type Msg
     | FetchComplete (String -> Msg) (Result Error CachedData)
     | SettingsMsgProxy SettingsMsg
     | NavigateToIssue (String, String)
+    | SearchIssues
+    | ChangeSearchTerms String
+    | IssuesSearchResults String
 
 type SettingsMsg
     = ChangeDefaultRepositoryType String

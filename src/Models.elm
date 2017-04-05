@@ -47,7 +47,14 @@ type alias Model =
     , filterStoriesBy : String
     , recentRepos : List String
     , etags : Dict.Dict String (String, String)
+    , searchTerms : String
+    , searchResults : RemoteData (List Issue)
     }
+
+type RemoteData a
+    = NotRequested
+    | Loading
+    | Loaded a
 
 
 type CachedData
