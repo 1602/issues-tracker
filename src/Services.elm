@@ -277,7 +277,7 @@ cachingFetch url etags oncomplete =
                 if etag /= "" then
                     [ Http.header "If-None-Match" etag ]
                 else
-                    [ ]
+                    [ Http.header "If-Modified-Since" "0" ]
             , url = url
             , expect = Http.expectStringResponse (\res ->
                 if res.status.code == 304 then

@@ -32,7 +32,7 @@ type alias Model =
     , currentIssues : Maybe (List Issue)
     , iceboxIssues : Maybe (List Issue)
     , closedIssues : Maybe (List Issue)
-    , milestones : Maybe (Dict.Dict String ExpandedMilestone)
+    , milestones : Dict.Dict String (Dict.Dict String ExpandedMilestone)
     , pickMilestoneForIssue : Maybe Issue
     , lockedIssueNumber : String
     , highlightStory : String

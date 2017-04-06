@@ -134,7 +134,7 @@ init ( persistentData, version ) location =
                 Nothing
                 Nothing
                 Nothing
-                Nothing
+                Dict.empty
                 Nothing
                 ""
                 highlightStory
@@ -541,6 +541,7 @@ update msg model =
 
                 milestone =
                     model.milestones
+                        |> Dict.get model.repo
                         |> Maybe.withDefault Dict.empty
                         |> Dict.get model.addIssueToMilestone
                         |> Maybe.andThen (\ms -> Just ms.milestone)
@@ -554,7 +555,7 @@ update msg model =
                     else
                         []
             in
-                { model | newIssueTitle = "" } ! cmd
+                { model | newIssueTitle = "", etags = Dict.empty } ! cmd
 
         StoryCreated col milestone result ->
             case result of
@@ -653,12 +654,6 @@ update msg model =
                     else
                         Nothing
 
-                milestones =
-                    if repo == model.repo then
-                        model.milestones
-                    else
-                        Nothing
-
                 recentRepos =
                     if (Maybe.withDefault "" <| List.head model.recentRepos) == repo then
                         model.recentRepos
@@ -674,7 +669,6 @@ update msg model =
                         | location = location
                         , repo = repo
                         , currentIssues = issues
-                        , milestones = milestones
                         , recentRepos = recentRepos
                      }
                         |> aboutToLoadResource location
@@ -724,19 +718,21 @@ update msg model =
                         Nothing ->
                             Nothing
 
+                updatedMilestones = Dict.update model.repo (\milestones ->
+                        Just
+                            (Maybe.withDefault Dict.empty milestones
+                                |> Dict.update num (updateMilestoneIssues <| issues issuesJson)
+                            )
+                    ) model.milestones
 
                 updatedModel =
                             { model
-                                | milestones =
-                                    Just
-                                        (Maybe.withDefault Dict.empty model.milestones
-                                            |> Dict.update num (updateMilestoneIssues <| issues issuesJson)
-                                        )
+                                | milestones = updatedMilestones
                             }
 
 
                 mss =
-                    case updatedModel.milestones of
+                    case Dict.get model.repo updatedModel.milestones of
                         Just milestones ->
                             Dict.values milestones
 
@@ -834,11 +830,11 @@ update msg model =
                                                                     )
                                                 )
                                         )
-                                        (model.milestones |> Maybe.withDefault Dict.empty)
+                                        (Dict.get model.repo model.milestones |> Maybe.withDefault Dict.empty)
 
                             updatedModel =
                                 { model
-                                    | milestones = Just updatedMilestones
+                                    | milestones = Dict.insert model.repo updatedMilestones model.milestones
                                     , recentRepos = recentRepos
                                     , error = Nothing
                                 }
@@ -911,7 +907,7 @@ update msg model =
             model ! [ clipboard str ]
 
         UnsetMilestone m result ->
-            { model | lockedIssueNumber = "" }
+            { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! [ fetchMilestoneIssues model OpenIssue m
                   , fetchIssues model Icebox
                   ]
@@ -943,13 +939,13 @@ update msg model =
                     model ! []
 
         MilestoneSet m result ->
-            { model | lockedIssueNumber = "" }
+            { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! [ fetchMilestoneIssues model OpenIssue m
                   , fetchIssues model Icebox
                   ]
 
         IssueRestarted m result ->
-            { model | lockedIssueNumber = "" }
+            { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case m of
                     Just milestone ->
                         [ fetchMilestoneIssues model ClosedIssue milestone
@@ -962,7 +958,7 @@ update msg model =
                         ]
 
         IssueStarted milestone result ->
-            { model | lockedIssueNumber = "" }
+            { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case milestone of
                     Just m ->
                         [ fetchMilestoneIssues model OpenIssue m
@@ -975,7 +971,7 @@ update msg model =
                         ]
 
         IssueFinished m result ->
-            { model | lockedIssueNumber = "" }
+            { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case m of
                     Just m ->
                         [ fetchMilestoneIssues model ClosedIssue m
@@ -1225,6 +1221,7 @@ view model =
                 , text <| " " ++ issue.title
                 , Html.hr [] []
                 , model.milestones
+                    |> Dict.get model.repo
                     |> Maybe.withDefault Dict.empty
                     |> Dict.values
                     |> List.map
@@ -1366,7 +1363,7 @@ viewPage user model route =
                     |> append groups.earlier "Updated more than a week ago" False
 
         milestonesIndex =
-            case model.milestones of
+            case Dict.get model.repo model.milestones of
                 Just milestones ->
                     milestones
                         |> Dict.values
@@ -1561,7 +1558,7 @@ viewPage user model route =
                             )
                         |> Maybe.andThen
                             (\htmlNode ->
-                                case displayIssuesWithinMilestones model.milestones OpenIssue of
+                                case displayIssuesWithinMilestones (Dict.get model.repo model.milestones) OpenIssue of
                                     Just html ->
                                         div [] [ htmlNode, html ] |> Just
 
@@ -1594,7 +1591,7 @@ viewPage user model route =
                             )
                         |> Maybe.andThen
                             (\htmlNode ->
-                                case displayIssuesWithinMilestones model.milestones ClosedIssue of
+                                case displayIssuesWithinMilestones (Dict.get model.repo model.milestones) ClosedIssue of
                                     Just html ->
                                         div [] [ htmlNode, html ] |> Just
 
