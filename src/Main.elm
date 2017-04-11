@@ -82,6 +82,10 @@ init ( persistentData, version ) location =
                 _ ->
                     ""
 
+        needFocus =
+            highlightStory /= ""
+
+
         pinnedMilestones =
             persistentData.pinnedMilestones
                 |> Dict.fromList
@@ -140,7 +144,7 @@ init ( persistentData, version ) location =
                 highlightStory
                 ""
                 ""
-                (highlightStory /= "")
+                needFocus
                 Done
                 ""
                 All
@@ -151,6 +155,8 @@ init ( persistentData, version ) location =
                 Dict.empty
                 ""
                 NotRequested
+                True -- didSwitch
+                (Dict.fromList persistentData.savedSearches)
 
         defaultRepo =
             if settings.defaultRepositoryType == "specified" then
@@ -194,58 +200,39 @@ hasNoLabel label issue =
     not <| hasLabel label issue
 
 
-aboutToLoadResource : Location -> Model -> Model
-aboutToLoadResource loc model =
-    let
-        page =
-            parseHash loc
-    in
-        case page of
-            Just (IssuesIndex user repo) ->
-                { model | highlightStory = "" }
-
-            Just (Story _ _ s) ->
-                { model | highlightStory = s }
-
-            _ ->
-                { model | highlightStory = "" }
-
-
 loadAllIssues : Model -> List (Cmd Msg)
 loadAllIssues model =
-    [ fetchIssues model Current
-    , fetchIssues model Icebox
-    , fetchIssues model Done
-    , fetchMilestones model
-    ]
+    if model.didSwitch then
+        [ fetchIssues model Current
+        , fetchIssues model Icebox
+        , fetchIssues model Done
+        , fetchMilestones model
+        ]
+    else
+        []
 
 
 loadResource : Model -> List (Cmd Msg)
 loadResource model =
-    case model.currentIssues of
-        Nothing ->
-            case model.user of
-                Just user ->
-                    case parseHash model.location of
-                        Just (Settings user repo) ->
-                            []
-
-                        Just (Story user repo id) ->
-                            loadAllIssues model
-
-                        Just (IssuesIndex user repo) ->
-                            loadAllIssues model
-
-                        Just (MilestonesIndex user repo) ->
-                            loadAllIssues model
-
-                        Nothing ->
-                            loadAllIssues model
-
-                Nothing ->
+    case model.user of
+        Just user ->
+            case parseHash model.location of
+                Just (Settings user repo) ->
                     []
 
-        _ ->
+                Just (Story user repo id) ->
+                    loadAllIssues model
+
+                Just (IssuesIndex user repo) ->
+                    loadAllIssues model
+
+                Just (MilestonesIndex user repo) ->
+                    loadAllIssues model
+
+                Nothing ->
+                    loadAllIssues model
+
+        Nothing ->
             []
 
 
@@ -266,6 +253,7 @@ updateLocalStorage model =
     saveData <|
         PersistedData
             model.accessToken
+            (Dict.toList model.savedSearches)
             (Dict.toList model.pinnedMilestones)
             (List.map toString model.showColumns)
             model.settings.defaultRepositoryType
@@ -337,6 +325,22 @@ update msg model =
     case msg of
         NoOp ->
             model ! []
+
+        ToggleSaveSearch ->
+            let
+                savedSearches s =
+                    if model.searchTerms == "" then
+                        s
+                    else
+                        if Dict.member model.searchTerms s then
+                            Dict.remove model.searchTerms s
+                        else
+                            Dict.insert model.searchTerms model.searchTerms s
+                            
+                updatedModel =
+                    { model | savedSearches = savedSearches model.savedSearches }
+            in
+                updatedModel ! [ updateLocalStorage updatedModel ]
 
         IssuesSearchResults issuesJson ->
             let
@@ -645,36 +649,51 @@ update msg model =
 
         UrlChange location ->
             let
-                repo =
+                newRepository =
                     extractRepo location.hash
 
-                issues =
-                    if repo == model.repo then
-                        model.currentIssues
-                    else
-                        Nothing
+                didSwitch =
+                    newRepository /= model.repo
+
+                prependNewRepositoryToRecent =
+                    newRepository
+                        :: (model.recentRepos
+                                |> List.filter ((/=) newRepository)
+                                |> List.take 19
+                           )
+
+                highlightStory =
+                    case parseHash location of
+                        Just (Story _ _ s) ->
+                            s
+
+                        _ ->
+                            ""
+                needFocus =
+                    (highlightStory /= "") && (highlightStory /= model.highlightStory)
+
 
                 recentRepos =
-                    if (Maybe.withDefault "" <| List.head model.recentRepos) == repo then
-                        model.recentRepos
+                    if didSwitch then
+                         model.recentRepos
                     else
-                        repo
-                            :: (model.recentRepos
-                                    |> List.filter ((/=) repo)
-                                    |> List.take 19
-                               )
+                         prependNewRepositoryToRecent
 
                 updatedModel =
-                    ({ model
+                    { model
                         | location = location
-                        , repo = repo
-                        , currentIssues = issues
+                        , didSwitch = didSwitch
+                        , repo = newRepository
+                        , needFocus = Debug.log "need focus" needFocus
+                        , highlightStory = highlightStory
                         , recentRepos = recentRepos
-                     }
-                        |> aboutToLoadResource location
-                    )
+                    }
             in
-                updatedModel ! loadResource updatedModel
+                updatedModel ! (loadResource updatedModel
+                            ++ (if needFocus then
+                                [ focus <| Debug.log "loc" location ]
+                                else
+                                    []))
 
         MilestoneIssuesLoaded num issueState issuesJson ->
             let
@@ -1511,12 +1530,27 @@ viewPage user model route =
                 [ column Search (
                    Just <|
                    Html.form [ style [ ("display", "inline-block" ), ("width","calc(100% - 128px)")], Html.Events.onSubmit SearchIssues ]
-                       [ Html.input [style [ ("background", "white" ), ("border-color", "cornflowerblue"), ("color", "royalblue" ), ( "width", "100%") , ("min-width", "40px") ], Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
+                       [ Html.input [Attrs.class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
+                       , Html.span [ onClick ToggleSaveSearch ] [ text "⭐" ]
                        ]
                     ) (Just <|
                    case model.searchResults of
                         NotRequested ->
-                            text ""
+                            div []
+                                [ Html.a
+                                    [ cellStyle "calc(100% - 10px)"
+                                    , Attrs.target "_blank"
+                                    , Attrs.href "https://help.github.com/articles/searching-issues/#search-within-a-users-or-organizations-repositories"
+                                    ] [ text "Github search documentation" ]
+                                , Html.ul []
+                                    <| (
+                                        model.savedSearches
+                                            |> Dict.values
+                                            |> List.map (\search ->
+                                                Html.li [] [ text search ]
+                                            )
+                                    )
+                                ]
 
                         Loading ->
                             text "Loading..."

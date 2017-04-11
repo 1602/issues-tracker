@@ -35,6 +35,10 @@ h3 > small {
     box-shadow: 0px 0px 19px 3px black;
 }
 
+.selected.story:focus {
+    outline: none;
+}
+
 .selected.story p {
     color: black;
     text-overflow: initial;
@@ -102,7 +106,20 @@ main > section {
     background: #222;
 }
 ::-webkit-scrollbar-thumb {
-    background: #888;
+    background: #555;
+}
+
+input.search-term {
+    background: white;
+    border-color: cornflowerblue;
+    color: royalblue;
+    width: 100%;
+    min-width: 40px;
+}
+
+input.search-term:focus {
+    outline-color: cornflowerblue;
+    border-color: royalblue;
 }
 
 section > h3 {

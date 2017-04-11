@@ -30,6 +30,9 @@ try {
     if (typeof appData.powerOfNow === 'undefined') {
         appData.powerOfNow = false;
     }
+    if (typeof appData.savedSearches === 'undefined') {
+        appData.savedSearches = [];
+    }
 } catch(e) {
     console.log(e);
     appData =
@@ -41,6 +44,7 @@ try {
         , recentRepos : [ 'universalbasket/engineering' ]
         , doneLimit : 'a day'
         , powerOfNow : false
+        , savedSearches : []
         };
 }
 

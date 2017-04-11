@@ -49,6 +49,8 @@ type alias Model =
     , etags : Dict.Dict String (String, String)
     , searchTerms : String
     , searchResults : RemoteData (List Issue)
+    , didSwitch : Bool
+    , savedSearches : Dict.Dict String String
     }
 
 type RemoteData a
@@ -64,6 +66,7 @@ type CachedData
 
 type alias PersistedData =
     { accessToken : Maybe String
+    , savedSearches : List (String, String)
     , pinnedMilestones : List (String, String)
     , columns : List String
     , defaultRepositoryType : String
