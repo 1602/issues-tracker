@@ -326,6 +326,9 @@ update msg model =
         NoOp ->
             model ! []
 
+        ClearSearch ->
+            { model | searchTerms = "", searchResults = NotRequested } ! []
+
         ToggleSaveSearch ->
             let
                 savedSearches s =
@@ -358,6 +361,12 @@ update msg model =
 
         ChangeSearchTerms terms ->
             { model | searchTerms = terms } ! []
+
+        SearchBy s ->
+            let
+                updatedModel = { model | searchTerms = s }
+            in
+                updatedModel ! [ searchIssues updatedModel ]
 
         SearchIssues ->
             model !
@@ -1476,6 +1485,7 @@ viewPage user model route =
                                     _ ->
                                         "calc(25% - 5px)"
                               )
+                            , ( "transition", "width .1s" )
                             , ( "padding-right", "0px" )
                             , ( "padding-left", "3px" )
                             , ( "flex-shrink", "0" )
@@ -1492,7 +1502,7 @@ viewPage user model route =
                             , span
                                 [ style
                                     [ ( "position", "absolute" )
-                                    , ( "right", "0px" )
+                                    , ( "right", "1px" )
                                     , ( "top", "10px" )
                                     , ( "width", "20px" )
                                     , ( "height", "20px" )
@@ -1529,9 +1539,21 @@ viewPage user model route =
                 ]
                 [ column Search (
                    Just <|
-                   Html.form [ style [ ("display", "inline-block" ), ("width","calc(100% - 128px)")], Html.Events.onSubmit SearchIssues ]
-                       [ Html.input [Attrs.class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
-                       , Html.span [ onClick ToggleSaveSearch ] [ text "⭐" ]
+                   Html.form [ class "search-issue", style [ ("display", "inline-block" ), ("width","calc(100% - 128px)")], Html.Events.onSubmit SearchIssues ]
+                       [ Html.input [class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
+                       , case model.searchResults of
+                            Loaded issues ->
+                               Html.span [ class "clear-search", onClick ClearSearch ] [ text "×" ]
+                            _ ->
+                                text ""
+                       , if model.searchTerms /= "" then
+                           case model.searchResults of
+                               Loaded issues ->
+                                   Html.span [ class (if Dict.member model.searchTerms model.savedSearches then "saved-search" else "not-saved-search"), onClick ToggleSaveSearch ] [ text "⭐" ]
+                               _ ->
+                                    text ""
+                        else
+                            text ""
                        ]
                     ) (Just <|
                    case model.searchResults of
@@ -1547,7 +1569,7 @@ viewPage user model route =
                                         model.savedSearches
                                             |> Dict.values
                                             |> List.map (\search ->
-                                                Html.li [] [ text search ]
+                                                Html.li [ onClick <| SearchBy search] [ text search ]
                                             )
                                     )
                                 ]
