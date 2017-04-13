@@ -2354,7 +2354,13 @@ reopeningColumnButton col showColumns list =
         if List.member col showColumns then
             (Html.button [
                 style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")
-                |> (++) [ ( "font-size", "18px" ), ("height", "30px" ), ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| HideColumn col ] [ text <| icon ]) :: list
+                |> (++)
+                    [ ( "font-size", "18px" )
+                    , ("height", "30px" )
+                    , ( "width", "30px" )
+                    , ( "margin-top", "10px" )
+                    , ( "transition", "filter 0.1s, background 0.1s" )
+                    ] ), onClick <| HideColumn col ] [ text <| icon ]) :: list
         else
             (Html.button [
                 style (buttonStyle |> List.filter (\( s, _ ) ->
@@ -2363,7 +2369,8 @@ reopeningColumnButton col showColumns list =
                     [ ( "font-size", "18px" )
                     , ( "background", "rgba(40,40,40,1)" )
                     , ( "color", "#bbb" )
-                    , ( "filter", "grayscale(0.9) " )
+                    , ( "transition", "filter 0.1s, background 0.1s" )
+                    , ( "filter", "grayscale(0.9) brightness(50%)" )
                     , ( "height", "30px" )
                     , ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| ReopenColumn col ] [ text <| icon ]) :: list
 
