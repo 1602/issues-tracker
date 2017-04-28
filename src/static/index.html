@@ -113,13 +113,42 @@ input.search-term {
     background: white;
     border-color: cornflowerblue;
     color: royalblue;
-    width: 100%;
+    width: calc(100% - 21px);
     min-width: 40px;
+    padding-right: 44px;
+    text-overflow: ellipsis;
 }
 
 input.search-term:focus {
     outline-color: cornflowerblue;
     border-color: royalblue;
+}
+
+form.search-issue .saved-search, form.search-issue .not-saved-search {
+    position: relative;
+    left: -54px;
+    top: 2px;
+    cursor: pointer;
+}
+
+form.search-issue .clear-search {
+    position: relative;
+    left: -19px;
+    cursor: pointer;
+    font-size: 19px;
+    display: inline-block;
+    width: 11px;
+    vertical-align: middle;
+    padding: 3px;
+    color: white;
+    background: rgba(100, 149, 237, 0.41);
+    line-height: 12px;
+    text-align: center;
+    border-radius: 2px;
+}
+
+form.search-issue .not-saved-search {
+    filter: grayscale(100%);
 }
 
 section > h3 {

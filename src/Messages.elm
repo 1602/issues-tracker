@@ -49,6 +49,8 @@ type Msg
     | ChangeSearchTerms String
     | IssuesSearchResults String
     | ToggleSaveSearch
+    | SearchBy String
+    | ClearSearch
 
 type SettingsMsg
     = ChangeDefaultRepositoryType String
