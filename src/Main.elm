@@ -336,7 +336,7 @@ update msg model =
                             Dict.remove model.searchTerms s
                         else
                             Dict.insert model.searchTerms model.searchTerms s
-                            
+
                 updatedModel =
                     { model | savedSearches = savedSearches model.savedSearches }
             in
@@ -882,9 +882,17 @@ update msg model =
         MilestoneCreated result ->
             case result of
                 Ok _ ->
-                    { model | error = Nothing }
-                        ! [ fetchMilestones model
-                          ]
+                    let
+                        s =
+                            model.settings
+                    in
+                        { model
+                            | error = Nothing
+                            -- TODO get rid of hack by applying powerOfNow setting on a view level (and separating list on issues with the list of milestones)
+                            , settings = { s | powerOfNow = False }
+                        }
+                            ! [ fetchMilestones model
+                              ]
 
                 Err e ->
                     { model | error = toString e |> Just } ! []
@@ -1675,7 +1683,14 @@ columnTitle col =
 viewSettings : Model -> Html SettingsMsg
 viewSettings model =
     let
-        option value current =
+        select onSelect values currentValue =
+            Html.select [ onInput onSelect ] <| options values currentValue
+
+        options values currentValue =
+            values
+                |> List.map (option currentValue)
+
+        option current value  =
             Html.option [ Attrs.selected <| value == current ] [ text value ]
 
         settingsBlock title contents =
@@ -1684,10 +1699,7 @@ viewSettings model =
         Html.main_ [ style [ ( "padding", "10px" ), ( "overflow-y", "auto" ), ( "height", "100vh" ), ( "width", "100vw") ] ]
             -- default repo
             [ settingsBlock "Default repository"
-                [ Html.select [ onInput ChangeDefaultRepositoryType ]
-                    [ option "last visited" model.settings.defaultRepositoryType
-                    , option "specified" model.settings.defaultRepositoryType
-                    ]
+                [ select ChangeDefaultRepositoryType [ "last visited", "specified" ] model.settings.defaultRepositoryType
                 , if model.settings.defaultRepositoryType == "specified" then
                     Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
                   else
@@ -1696,12 +1708,7 @@ viewSettings model =
                 ]
               -- limit
             , settingsBlock "Limit for 'We just did it'"
-                [ Html.select [ onInput ChangeDoneLimit ]
-                    [ option "a day" model.settings.doneLimit
-                    , option "a week" model.settings.doneLimit
-                    , option "two weeks" model.settings.doneLimit
-                    , option "a month" model.settings.doneLimit
-                    ]
+                [ select ChangeDoneLimit [ "a day",  "a week", "two weeks", "a month" ] model.settings.doneLimit
                 , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
                 ]
               -- focused mode: ignore milestones with no due date
