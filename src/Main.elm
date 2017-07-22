@@ -1295,7 +1295,7 @@ view model =
     in
         div [ style [ ( "display", "flex" ) ] ] <|
             [ viewNavigation model.user model
-            , if model.persistentData.accessToken == "" then
+            , if model.persistentData.accessToken /= "" then
                 viewPage model.user model <| parseHash model.location
               else
                 div []

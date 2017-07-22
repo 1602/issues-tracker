@@ -7,7 +7,7 @@ Organise your github issues using kanban board
 ```
 git clone https://github.com/1602/issues-tracker
 cd issues-tracker
-npm install
+yarn install
 elm package install
 ```
 
