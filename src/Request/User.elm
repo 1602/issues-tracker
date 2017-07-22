@@ -1,20 +1,19 @@
 module Request.User exposing (get)
 
+import Base64
 import Http exposing (Error, Response)
 import Messages exposing (Msg(..))
 import Dict
 import Data.User as User exposing (User)
 import Json.Decode as Decode
+import HttpBuilder exposing (withHeader)
+import Request.Helpers exposing (withAuthorization)
+
 
 get : String -> Cmd Msg
 get accessToken =
-    Http.request
-        { method = "GET"
-        , headers = [ Http.header "If-Modified-Since" "0"]
-        , url =
-            "https://api.github.com/user?access_token="
-                ++ accessToken
-        , expect = Http.expectStringResponse (\res ->
+    let
+        expect = Http.expectStringResponse (\res ->
             let
                 hasRepoOauthScope =
                     res.headers
@@ -31,8 +30,19 @@ get accessToken =
                 else
                     Err "Insufficient permissions: 'repo' oauth scope is required"
                 )
-        , body = Http.emptyBody
-        , timeout = Nothing
-        , withCredentials = False
-        }
-            |> Http.send LoadUser
+    in
+    "https://api.github.com/user"
+        |> HttpBuilder.get
+        |> HttpBuilder.withExpect expect
+        |> withAuthorization accessToken
+        |> withHeader "if-modified-since" "0"
+        |> HttpBuilder.toRequest
+        |> Http.send LoadUser
+
+buildAuthHeader : String -> String
+buildAuthHeader secretKey =
+    secretKey ++ ":"
+        |> Base64.encode
+        |> Result.withDefault ""
+        |> (++) "Basic "
+

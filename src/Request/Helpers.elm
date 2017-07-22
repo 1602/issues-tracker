@@ -1,4 +1,6 @@
-module Request.Helpers exposing (authHeader, cachingFetch)
+module Request.Helpers exposing (authHeader, cachingFetch, withAuthorization)
+
+import HttpBuilder exposing (RequestBuilder, withHeader)
 
 import Base64
 -- import Task
@@ -62,4 +64,10 @@ cachingFetch url etags oncomplete =
             , withCredentials = False
             }
             |> Http.send (FetchComplete oncomplete)
+
+
+withAuthorization : String -> RequestBuilder a -> RequestBuilder a
+withAuthorization token builder =
+    builder
+        |> withHeader "authorization" ("Basic " ++ (token ++ ":" |> Base64.encode |> Result.withDefault ""))
 
