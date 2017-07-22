@@ -23,6 +23,7 @@ import GithubMarkdown exposing (ghMd)
 import Data.Issue as Issue exposing (Issue)
 import Data.User as User exposing (User)
 import Data.Milestone as Milestone
+import Request.Issue
 
 
 -- import Base exposing (..)
@@ -205,9 +206,9 @@ hasNoLabel label issue =
 loadAllIssues : Model -> List (Cmd Msg)
 loadAllIssues model =
     if model.didSwitch then
-        [ fetchIssues model Current
-        , fetchIssues model Icebox
-        , fetchIssues model Done
+        [ Request.Issue.list model Current
+        , Request.Issue.list model Icebox
+        , Request.Issue.list model Done
         , fetchMilestones model
         ]
     else
@@ -565,7 +566,7 @@ update msg model =
                     if model.newIssueTitle /= "" then
                         [ setFocus "create-story"
                         , StoryCreated col milestone
-                            |> createIssue model.repo model.accessToken encodedIssue
+                            |> Request.Issue.create model.repo model.accessToken encodedIssue
                         ]
                     else
                         []
@@ -586,14 +587,14 @@ update msg model =
                                             fetchMilestoneIssues model OpenIssue ms
 
                                         Nothing ->
-                                            fetchIssues model Icebox
+                                            Request.Issue.list model Icebox
 
                                 _ ->
-                                    fetchIssues model col
+                                    Request.Issue.list model col
                           ]
 
         UrgentIssueAdded result ->
-            model ! [ fetchIssues model Icebox ]
+            model ! [ Request.Issue.list model Icebox ]
 
         StoryFocused ->
             { model | needFocus = False } ! []
@@ -947,7 +948,7 @@ update msg model =
         UnsetMilestone m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! [ fetchMilestoneIssues model OpenIssue m
-                  , fetchIssues model Icebox
+                  , Request.Issue.list model Icebox
                   ]
 
         SetMilestone issue milestone ->
@@ -979,7 +980,7 @@ update msg model =
         MilestoneSet m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! [ fetchMilestoneIssues model OpenIssue m
-                  , fetchIssues model Icebox
+                  , Request.Issue.list model Icebox
                   ]
 
         IssueRestarted m result ->
@@ -987,12 +988,12 @@ update msg model =
                 ! case m of
                     Just milestone ->
                         [ fetchMilestoneIssues model ClosedIssue milestone
-                        , fetchIssues model Current
+                        , Request.Issue.list model Current
                         ]
 
                     Nothing ->
-                        [ fetchIssues model Done
-                        , fetchIssues model Current
+                        [ Request.Issue.list model Done
+                        , Request.Issue.list model Current
                         ]
 
         IssueStarted milestone result ->
@@ -1000,12 +1001,12 @@ update msg model =
                 ! case milestone of
                     Just m ->
                         [ fetchMilestoneIssues model OpenIssue m
-                        , fetchIssues model Current
+                        , Request.Issue.list model Current
                         ]
 
                     Nothing ->
-                        [ fetchIssues model Current
-                        , fetchIssues model Icebox
+                        [ Request.Issue.list model Current
+                        , Request.Issue.list model Icebox
                         ]
 
         IssueFinished m result ->
@@ -1013,12 +1014,12 @@ update msg model =
                 ! case m of
                     Just m ->
                         [ fetchMilestoneIssues model ClosedIssue m
-                        , fetchIssues model Current
+                        , Request.Issue.list model Current
                         ]
 
                     Nothing ->
-                        [ fetchIssues model Current
-                        , fetchIssues model Done
+                        [ Request.Issue.list model Current
+                        , Request.Issue.list model Done
                         ]
 
         DismissPlanningIssue ->

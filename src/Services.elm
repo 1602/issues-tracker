@@ -50,22 +50,6 @@ createMilestone repo title accessToken =
             |> Http.send MilestoneCreated
 
 
-createIssue : String -> Maybe String -> Encode.Value -> (Result Error Issue -> a) -> Cmd a
-createIssue repo accessToken data onComplete =
-    Http.request
-        { method = "POST"
-        , headers = []
-        , url =
-            "https://api.github.com/repos/" ++ repo ++ "/issues"
-            ++ "?access_token=" ++ (Maybe.withDefault "" accessToken)
-        , expect = Http.expectJson <| Issue.decoder
-        , body = Http.jsonBody data
-        , timeout = Nothing
-        , withCredentials = False
-        }
-            |> Http.send onComplete
-
-
 fetchMilestoneIssues : Model -> IssueState -> Milestone -> Cmd Msg
 fetchMilestoneIssues model issueState ms =
     let
@@ -143,112 +127,6 @@ fetchMilestoneIssues model issueState ms =
             model.etags
             (MilestoneIssuesLoaded ms.number issueState)
 
-fetchIssues : Model -> Column -> Cmd Msg
-fetchIssues model column =
-    let
-        filter =
-           model.filter
-
-        repo =
-           model.repo
-
-        accessToken =
-            Maybe.withDefault "" model.accessToken
-
-        milestone =
-            case column of
-                Icebox ->
-                    "&milestone=none"
-
-                Done ->
-                    "&milestone=none"
-
-                _ ->
-                    ""
-
-        labels =
-            case column of
-                Icebox ->
-                    ""
-
-                Search ->
-                    ""
-
-                Backlog ->
-                    "&labels=Status: Ready"
-
-                Current ->
-                    "&labels=Status: In Progress"
-
-                Done ->
-                    -- "&labels=Status: Completed"
-                    ""
-
-        state =
-            case column of
-                Done ->
-                    "&state=closed"
-
-                _ ->
-                    ""
-
-        filterByUser =
-            case filter of
-                CreatedBy user ->
-                    "&creator=" ++ user
-
-                AssignedTo user ->
-                    "&assignee=" ++ user
-
-                HasMentionOf user ->
-                    "&mentioned=" ++ user
-
-                All ->
-                    ""
-
-        pastMoment duration interval =
-            model.now
-                |> Date.add interval duration
-                |> Date.floor Hour
-                |> Date.toUtcIsoString
-                |> (++) "&since="
-
-        since =
-            case column of
-                Done ->
-                    case model.settings.doneLimit of
-                        "a day" ->
-                            pastMoment -1 Day
-
-                        "a week" ->
-                            pastMoment -1 Week
-
-                        "two weeks" ->
-                            pastMoment -2 Week
-
-                        "a month" ->
-                            pastMoment -1 Month
-
-                        _ ->
-                            ""
-                _ ->
-                    ""
-        url =
-            "https://api.github.com/repos/"
-                ++ repo
-                ++ "/issues?access_token="
-                ++ accessToken
-                ++ "&sort=updated"
-                ++ labels
-                ++ state
-                ++ milestone
-                ++ filterByUser
-                ++ since
-    in
-        cachingFetch
-            url
-            model.etags
-            (IssuesLoaded column)
 
 
 cachingFetch : String -> Dict.Dict String (String, String) -> (String -> Msg) -> Cmd Msg
