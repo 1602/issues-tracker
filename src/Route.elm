@@ -15,13 +15,13 @@ route : Parser (Route -> a) a
 route =
     let
         repo =
-            1--(string </> string </> identity)
+            string </> string
     in
         oneOf
-            [ map IssuesIndex (string </> string </> s "stories")
-            , map MilestonesIndex (string </> string </> s  "milestones")
-            , map Story (string </> string </> s "stories" </> string)
-            , map Settings (string </> string </> s  "settings")
+            [ map IssuesIndex <| repo </> s "stories"
+            , map MilestonesIndex <| repo </> s  "milestones"
+            , map Story <| repo </> s "stories" </> string
+            , map Settings <| repo </> s  "settings"
             ]
 
 parseHash : Location -> Maybe Route
