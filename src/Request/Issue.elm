@@ -7,33 +7,30 @@ import Json.Decode exposing (Value)
 import Models exposing (Model, Column(..), Filter(..), IssueState(..))
 import Date.Extra as Date exposing (Interval(..))
 import Messages exposing (Msg(..))
-import Request.Helpers exposing (cachingFetch)
+import Request.Helpers exposing (cachingFetch, withAuthorization, apiUrl)
 import Json.Encode as Encode
+import HttpBuilder
+
 
 create : String -> Maybe String -> Value -> (Result Error Issue -> a) -> Cmd a
 create repo accessToken data onComplete =
-    Http.request
-        { method = "POST"
-        , headers = []
-        , url =
-            "https://api.github.com/repos/" ++ repo ++ "/issues"
-            ++ "?access_token=" ++ (Maybe.withDefault "" accessToken)
-        , expect = Http.expectJson <| Issue.decoder
-        , body = Http.jsonBody data
-        , timeout = Nothing
-        , withCredentials = False
-        }
-            |> Http.send onComplete
+    apiUrl ("/repos/" ++ repo ++ "/issues")
+        |> HttpBuilder.post
+        |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
+        |> HttpBuilder.withBody (Http.jsonBody data)
+        |> withAuthorization (Maybe.withDefault "" accessToken)
+        |> HttpBuilder.toRequest
+        |> Http.send onComplete
 
 
 list : Model -> Column -> Cmd Msg
 list model column =
     let
         filter =
-           model.filter
+            model.filter
 
         repo =
-           model.repo
+            model.repo
 
         accessToken =
             Maybe.withDefault "" model.accessToken
@@ -114,24 +111,28 @@ list model column =
 
                         _ ->
                             ""
+
                 _ ->
                     ""
+
         url =
-            "https://api.github.com/repos/"
-                ++ repo
-                ++ "/issues"
-                ++ "?sort=updated"
-                ++ labels
-                ++ state
-                ++ milestone
-                ++ filterByUser
-                ++ since
+            apiUrl <|
+                "/repos/"
+                    ++ repo
+                    ++ "/issues"
+                    ++ "?sort=updated"
+                    ++ labels
+                    ++ state
+                    ++ milestone
+                    ++ filterByUser
+                    ++ since
     in
         cachingFetch
             url
             accessToken
             model.etags
             (IssuesLoaded column)
+
 
 listForMilestone : Model -> IssueState -> Milestone -> Cmd Msg
 listForMilestone model issueState ms =
@@ -192,17 +193,21 @@ listForMilestone model issueState ms =
 
                         _ ->
                             ""
+
                 OpenIssue ->
                     ""
+
         url =
-            "https://api.github.com/repos/"
-                ++ repo
-                ++ "/issues?"
-                ++ state
-                ++ "&sort=updated"
-                ++ "&milestone=" ++ ms.number
-                ++ filterByUser
-                ++ since
+            apiUrl <|
+                "/repos/"
+                    ++ repo
+                    ++ "/issues?"
+                    ++ state
+                    ++ "&sort=updated"
+                    ++ "&milestone="
+                    ++ ms.number
+                    ++ filterByUser
+                    ++ since
     in
         cachingFetch
             url
@@ -213,33 +218,19 @@ listForMilestone model issueState ms =
 
 update : String -> String -> Encode.Value -> String -> (Result Error Issue -> a) -> Cmd a
 update repo issueNumber issue accessToken onComplete =
-    Http.request
-        { method = "PATCH"
-        , headers = []
-        , url =
-            "https://api.github.com/repos/"
-                ++ repo
-                ++ "/issues/"
-                ++ issueNumber
-                ++ "?access_token="
-                ++ accessToken
-        , expect = Http.expectJson Issue.decoder
-        , body = Http.jsonBody issue
-        , timeout = Nothing
-        , withCredentials = False
-        }
+    apiUrl ("/repos/" ++ repo ++ "/issues/" ++ issueNumber)
+        |> HttpBuilder.patch
+        |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
+        |> withAuthorization accessToken
+        |> HttpBuilder.withBody (Http.jsonBody issue)
+        |> HttpBuilder.toRequest
         |> Http.send onComplete
 
 
 search : Model -> Cmd Msg
 search { repo, accessToken, searchTerms, etags } =
-    let
-        url =
-            "https://api.github.com/search/issues?"
-                ++ "q=repo:" ++ repo ++ " " ++ searchTerms
-    in
-        cachingFetch
-            url
-            (accessToken |> Maybe.withDefault "")
-            etags
-            IssuesSearchResults
+    cachingFetch
+        (apiUrl <| "/search/issues?" ++ "q=repo:" ++ repo ++ " " ++ searchTerms)
+        (accessToken |> Maybe.withDefault "")
+        etags
+        IssuesSearchResults

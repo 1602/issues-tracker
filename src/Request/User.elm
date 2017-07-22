@@ -13,36 +13,39 @@ import Request.Helpers exposing (withAuthorization)
 get : String -> Cmd Msg
 get accessToken =
     let
-        expect = Http.expectStringResponse (\res ->
-            let
-                hasRepoOauthScope =
-                    res.headers
-                        |> Dict.toList
-                        |> List.map (\(key, value) -> (String.toLower key, value))
-                        |> Dict.fromList
-                        |> Dict.get "x-oauth-scopes"
-                        |> Maybe.withDefault ""
-                        |> String.split ", "
-                        |> List.member "repo"
-            in
-                if hasRepoOauthScope then
-                    Decode.decodeString User.decoder res.body
-                else
-                    Err "Insufficient permissions: 'repo' oauth scope is required"
+        expect =
+            Http.expectStringResponse
+                (\res ->
+                    let
+                        hasRepoOauthScope =
+                            res.headers
+                                |> Dict.toList
+                                |> List.map (\( key, value ) -> ( String.toLower key, value ))
+                                |> Dict.fromList
+                                |> Dict.get "x-oauth-scopes"
+                                |> Maybe.withDefault ""
+                                |> String.split ", "
+                                |> List.member "repo"
+                    in
+                        if hasRepoOauthScope then
+                            Decode.decodeString User.decoder res.body
+                        else
+                            Err "Insufficient permissions: 'repo' oauth scope is required"
                 )
     in
-    "https://api.github.com/user"
-        |> HttpBuilder.get
-        |> HttpBuilder.withExpect expect
-        |> withAuthorization accessToken
-        |> withHeader "if-modified-since" "0"
-        |> HttpBuilder.toRequest
-        |> Http.send LoadUser
+        "https://api.github.com/user"
+            |> HttpBuilder.get
+            |> HttpBuilder.withExpect expect
+            |> withAuthorization accessToken
+            |> withHeader "if-modified-since" "0"
+            |> HttpBuilder.toRequest
+            |> Http.send LoadUser
+
 
 buildAuthHeader : String -> String
 buildAuthHeader secretKey =
-    secretKey ++ ":"
+    secretKey
+        ++ ":"
         |> Base64.encode
         |> Result.withDefault ""
         |> (++) "Basic "
-
