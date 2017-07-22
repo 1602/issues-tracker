@@ -1,10 +1,9 @@
-port module Main exposing (..)
+module Main exposing (..)
 
 import Route exposing (Route, Route(..), parseHash)
 import Models exposing (..)
 import Messages exposing (..)
 import Dict
-import List
 import Html exposing (Html, span, text, img, div)
 import Navigation exposing (programWithFlags, Location)
 import Http exposing (Error(..), Response)
@@ -28,6 +27,7 @@ import Request.Milestone
 import Data.PersistentData exposing (PersistentData)
 import Data.Column exposing (Column(..))
 import Json.Decode exposing (Value)
+import Ports exposing (saveData)
 
 
 main : Program Value Model Msg
@@ -216,15 +216,6 @@ loadResource model =
 
         Nothing ->
             []
-
-
-port navigateToIssue : (( String, String ) -> msg) -> Sub msg
-
-
-port saveData : Value -> Cmd msg
-
-
-port clipboard : String -> Cmd msg
 
 
 updateLocalStorage : Model -> Cmd msg
@@ -957,7 +948,7 @@ update msg model =
                         model ! []
 
         CopyText str ->
-            model ! [ clipboard str ]
+            model ! [ Ports.clipboard str ]
 
         UnsetMilestone m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
@@ -1217,7 +1208,6 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Time.every (30 * Time.second) CurrentTime
-        , navigateToIssue NavigateToIssue
         ]
 
 
