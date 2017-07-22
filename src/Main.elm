@@ -456,7 +456,6 @@ update msg model =
                     model.persistentData
 
                 updatedPersistentData =
-
                     { pd
                         | columns =
                             pd.columns
@@ -617,21 +616,27 @@ update msg model =
                         updatedModel ! (loadResource updatedModel)
 
                 Err e ->
-                    let pd = model.persistentData
+                    let
+                        pd =
+                            model.persistentData
                     in
-                    case e of
-                        NetworkError ->
-                            { model | error = Just (toString e) } ! []
+                        case e of
+                            NetworkError ->
+                                { model | error = Just (toString e) } ! []
 
-                        _ ->
-                            { model | error = Just (toString e), persistentData = { pd | accessToken = "" }, user = Nothing } ! []
+                            _ ->
+                                { model | error = Just (toString e), persistentData = { pd | accessToken = "" }, user = Nothing } ! []
 
         SaveAccessToken ->
             let
-                pd = model.persistentData
+                pd =
+                    model.persistentData
+
                 upd =
                     { pd | accessToken = model.token }
-                updatedModel = { model | persistentData = upd }
+
+                updatedModel =
+                    { model | persistentData = upd }
             in
                 if model.token == "" then
                     model ! [ Navigation.load "https://github.com/settings/tokens" ]
@@ -872,7 +877,8 @@ update msg model =
                                         )
                                         (Dict.get model.repo model.milestones |> Maybe.withDefault Dict.empty)
 
-                            pd = model.persistentData
+                            pd =
+                                model.persistentData
 
                             updatedModel =
                                 { model
@@ -883,22 +889,21 @@ update msg model =
                         in
                             updatedModel
                                 ! (if model.persistentData.accessToken /= "" then
-                                        (updateLocalStorage updatedModel)
-                                            :: (updatedMilestones
-                                                    |> Dict.values
-                                                    |> List.map .milestone
-                                                    |> List.filter (\ms -> ms.openIssues > 0)
-                                                    |> List.map (Request.Issue.listForMilestone model OpenIssue)
-                                               )
-                                            ++ (updatedMilestones
-                                                    |> Dict.values
-                                                    |> List.map .milestone
-                                                    |> List.filter (\ms -> ms.closedIssues > 0)
-                                                    |> List.map (Request.Issue.listForMilestone model ClosedIssue)
-                                               )
-
-                                    else
-                                        []
+                                    (updateLocalStorage updatedModel)
+                                        :: (updatedMilestones
+                                                |> Dict.values
+                                                |> List.map .milestone
+                                                |> List.filter (\ms -> ms.openIssues > 0)
+                                                |> List.map (Request.Issue.listForMilestone model OpenIssue)
+                                           )
+                                        ++ (updatedMilestones
+                                                |> Dict.values
+                                                |> List.map .milestone
+                                                |> List.filter (\ms -> ms.closedIssues > 0)
+                                                |> List.map (Request.Issue.listForMilestone model ClosedIssue)
+                                           )
+                                   else
+                                    []
                                   )
 
         MilestoneCreated result ->
@@ -984,7 +989,6 @@ update msg model =
                             model.persistentData.accessToken
                             (MilestoneSet milestone)
                       ]
-
             else
                 model ! []
 
@@ -1038,161 +1042,160 @@ update msg model =
 
         IssueAction issue action ->
             if model.persistentData.accessToken /= "" then
-                    case action of
-                        "unplan" ->
-                            case issue.milestone of
-                                Just m ->
-                                    { model | lockedIssueNumber = issue.number }
-                                        ! [ UnsetMilestone m
-                                                |> Request.Issue.update model.repo
-                                                    issue.number
-                                                    (Encode.object [ ( "milestone", Encode.null ) ])
-                                                    model.persistentData.accessToken
-                                          ]
-
-                                Nothing ->
-                                    model ! []
-
-                        "start" ->
-                            case model.user of
-                                Just user ->
-                                    { model | lockedIssueNumber = issue.number }
-                                        ! [ Request.Issue.update model.repo
+                case action of
+                    "unplan" ->
+                        case issue.milestone of
+                            Just m ->
+                                { model | lockedIssueNumber = issue.number }
+                                    ! [ UnsetMilestone m
+                                            |> Request.Issue.update model.repo
                                                 issue.number
-                                                (Encode.object
-                                                    [ ( "labels"
-                                                      , issue.labels
-                                                            |> List.map .name
-                                                            |> List.filter ((/=) "Status: In Progress")
-                                                            |> List.filter ((/=) "Status: Ready")
-                                                            |> (::) "Status: In Progress"
-                                                            |> List.map Encode.string
-                                                            |> Encode.list
-                                                      )
-                                                    , ( "assignees"
-                                                      , [ Encode.string user.login ] |> Encode.list
-                                                      )
-                                                    ]
-                                                )
+                                                (Encode.object [ ( "milestone", Encode.null ) ])
                                                 model.persistentData.accessToken
-                                                (IssueStarted issue.milestone)
-                                          ]
+                                      ]
 
-                                Nothing ->
-                                    model ! []
+                            Nothing ->
+                                model ! []
 
-                        "finish" ->
-                            { model | lockedIssueNumber = issue.number }
-                                ! [ Request.Issue.update model.repo
-                                        issue.number
-                                        (Encode.object
-                                            [ ( "labels"
-                                              , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter ((/=) "Status: In Progress")
-                                                    |> (::) "Status: Completed"
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
-                                              )
-                                            , ( "state", Encode.string "closed" )
-                                            ]
-                                        )
-                                        model.persistentData.accessToken
-                                        (IssueFinished issue.milestone)
-                                  ]
+                    "start" ->
+                        case model.user of
+                            Just user ->
+                                { model | lockedIssueNumber = issue.number }
+                                    ! [ Request.Issue.update model.repo
+                                            issue.number
+                                            (Encode.object
+                                                [ ( "labels"
+                                                  , issue.labels
+                                                        |> List.map .name
+                                                        |> List.filter ((/=) "Status: In Progress")
+                                                        |> List.filter ((/=) "Status: Ready")
+                                                        |> (::) "Status: In Progress"
+                                                        |> List.map Encode.string
+                                                        |> Encode.list
+                                                  )
+                                                , ( "assignees"
+                                                  , [ Encode.string user.login ] |> Encode.list
+                                                  )
+                                                ]
+                                            )
+                                            model.persistentData.accessToken
+                                            (IssueStarted issue.milestone)
+                                      ]
 
-                        "restart" ->
-                            { model | lockedIssueNumber = issue.number }
-                                ! [ Request.Issue.update model.repo
-                                        issue.number
-                                        (Encode.object
-                                            [ ( "labels"
-                                              , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter ((/=) "Status: Completed")
-                                                    |> List.filter ((/=) "Status: In Progress")
-                                                    |> (::) "Status: In Progress"
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
-                                              )
-                                            , ( "state", Encode.string "open" )
-                                            ]
-                                        )
-                                        model.persistentData.accessToken
-                                        (IssueRestarted issue.milestone)
-                                  ]
+                            Nothing ->
+                                model ! []
 
-                        "unstart" ->
-                            { model | lockedIssueNumber = issue.number }
-                                ! [ Request.Issue.update model.repo
-                                        issue.number
-                                        (Encode.object
-                                            [ ( "labels"
-                                              , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter ((/=) "Status: Ready")
-                                                    |> List.filter ((/=) "Status: In Progress")
-                                                    |> (\labels ->
-                                                            case issue.milestone of
-                                                                Nothing ->
-                                                                    "Status: Ready" :: labels
+                    "finish" ->
+                        { model | lockedIssueNumber = issue.number }
+                            ! [ Request.Issue.update model.repo
+                                    issue.number
+                                    (Encode.object
+                                        [ ( "labels"
+                                          , issue.labels
+                                                |> List.map .name
+                                                |> List.filter ((/=) "Status: In Progress")
+                                                |> (::) "Status: Completed"
+                                                |> List.map Encode.string
+                                                |> Encode.list
+                                          )
+                                        , ( "state", Encode.string "closed" )
+                                        ]
+                                    )
+                                    model.persistentData.accessToken
+                                    (IssueFinished issue.milestone)
+                              ]
 
-                                                                Just _ ->
-                                                                    labels
-                                                       )
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
-                                              )
-                                            ]
-                                        )
-                                        model.persistentData.accessToken
-                                        (IssueStarted issue.milestone)
-                                  ]
+                    "restart" ->
+                        { model | lockedIssueNumber = issue.number }
+                            ! [ Request.Issue.update model.repo
+                                    issue.number
+                                    (Encode.object
+                                        [ ( "labels"
+                                          , issue.labels
+                                                |> List.map .name
+                                                |> List.filter ((/=) "Status: Completed")
+                                                |> List.filter ((/=) "Status: In Progress")
+                                                |> (::) "Status: In Progress"
+                                                |> List.map Encode.string
+                                                |> Encode.list
+                                          )
+                                        , ( "state", Encode.string "open" )
+                                        ]
+                                    )
+                                    model.persistentData.accessToken
+                                    (IssueRestarted issue.milestone)
+                              ]
 
-                        "plan" ->
-                            { model | pickMilestoneForIssue = Just issue } ! []
+                    "unstart" ->
+                        { model | lockedIssueNumber = issue.number }
+                            ! [ Request.Issue.update model.repo
+                                    issue.number
+                                    (Encode.object
+                                        [ ( "labels"
+                                          , issue.labels
+                                                |> List.map .name
+                                                |> List.filter ((/=) "Status: Ready")
+                                                |> List.filter ((/=) "Status: In Progress")
+                                                |> (\labels ->
+                                                        case issue.milestone of
+                                                            Nothing ->
+                                                                "Status: Ready" :: labels
 
-                        "ice" ->
-                            model
-                                ! [ Request.Issue.update model.repo
-                                        issue.number
-                                        (Encode.object
-                                            [ ( "labels"
-                                              , issue.labels
-                                                    |> List.map .name
-                                                    |> List.filter ((/=) "Status: Ready")
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
-                                              )
-                                            ]
-                                        )
-                                        model.persistentData.accessToken
-                                        UrgentIssueAdded
-                                  ]
+                                                            Just _ ->
+                                                                labels
+                                                   )
+                                                |> List.map Encode.string
+                                                |> Encode.list
+                                          )
+                                        ]
+                                    )
+                                    model.persistentData.accessToken
+                                    (IssueStarted issue.milestone)
+                              ]
 
-                        "just do it" ->
-                            model
-                                ! [ Request.Issue.update model.repo
-                                        issue.number
-                                        (Encode.object
-                                            [ ( "labels"
-                                              , issue.labels
-                                                    |> List.map .name
-                                                    |> (::) "Status: Ready"
-                                                    |> List.map Encode.string
-                                                    |> Encode.list
-                                              )
-                                            ]
-                                        )
-                                        model.persistentData.accessToken
-                                        UrgentIssueAdded
-                                  ]
+                    "plan" ->
+                        { model | pickMilestoneForIssue = Just issue } ! []
 
-                        _ ->
-                            model ! []
+                    "ice" ->
+                        model
+                            ! [ Request.Issue.update model.repo
+                                    issue.number
+                                    (Encode.object
+                                        [ ( "labels"
+                                          , issue.labels
+                                                |> List.map .name
+                                                |> List.filter ((/=) "Status: Ready")
+                                                |> List.map Encode.string
+                                                |> Encode.list
+                                          )
+                                        ]
+                                    )
+                                    model.persistentData.accessToken
+                                    UrgentIssueAdded
+                              ]
 
-                else
-                    model ! []
+                    "just do it" ->
+                        model
+                            ! [ Request.Issue.update model.repo
+                                    issue.number
+                                    (Encode.object
+                                        [ ( "labels"
+                                          , issue.labels
+                                                |> List.map .name
+                                                |> (::) "Status: Ready"
+                                                |> List.map Encode.string
+                                                |> Encode.list
+                                          )
+                                        ]
+                                    )
+                                    model.persistentData.accessToken
+                                    UrgentIssueAdded
+                              ]
+
+                    _ ->
+                        model ! []
+            else
+                model ! []
 
 
 save : Result Error a -> Model -> (a -> Model) -> ( Model, Cmd Msg )
