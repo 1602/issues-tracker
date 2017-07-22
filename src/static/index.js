@@ -1,5 +1,3 @@
-// pull in desired CSS/SASS files
-// require( './styles/main.scss' );
 
 let appData;
 
@@ -49,7 +47,6 @@ try {
 }
 
 // inject bundled Elm app into div#main
-const Elm = require('../Main');
 const elm = Elm.Main.embed( document.getElementById( 'main' ), [ appData, __VERSION__ ] );
 
 window.onSignIn = function(googleUser) {
