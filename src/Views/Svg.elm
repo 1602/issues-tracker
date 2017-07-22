@@ -1,4 +1,4 @@
-module Cruft exposing (clipboardIcon)
+module Views.Svg exposing (clipboardIcon)
 
 import Svg
 import Svg.Attributes
