@@ -584,7 +584,7 @@ update msg model =
                                 Backlog ->
                                     case milestone of
                                         Just ms ->
-                                            fetchMilestoneIssues model OpenIssue ms
+                                            Request.Issue.listForMilestone model OpenIssue ms
 
                                         Nothing ->
                                             Request.Issue.list model Icebox
@@ -878,13 +878,13 @@ update msg model =
                                                     |> Dict.values
                                                     |> List.map .milestone
                                                     |> List.filter (\ms -> ms.openIssues > 0)
-                                                    |> List.map (fetchMilestoneIssues model OpenIssue)
+                                                    |> List.map (Request.Issue.listForMilestone model OpenIssue)
                                                )
                                             ++ (updatedMilestones
                                                     |> Dict.values
                                                     |> List.map .milestone
                                                     |> List.filter (\ms -> ms.closedIssues > 0)
-                                                    |> List.map (fetchMilestoneIssues model ClosedIssue)
+                                                    |> List.map (Request.Issue.listForMilestone model ClosedIssue)
                                                )
 
                                     Nothing ->
@@ -947,7 +947,7 @@ update msg model =
 
         UnsetMilestone m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
-                ! [ fetchMilestoneIssues model OpenIssue m
+                ! [ Request.Issue.listForMilestone model OpenIssue m
                   , Request.Issue.list model Icebox
                   ]
 
@@ -979,7 +979,7 @@ update msg model =
 
         MilestoneSet m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
-                ! [ fetchMilestoneIssues model OpenIssue m
+                ! [ Request.Issue.listForMilestone model OpenIssue m
                   , Request.Issue.list model Icebox
                   ]
 
@@ -987,7 +987,7 @@ update msg model =
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case m of
                     Just milestone ->
-                        [ fetchMilestoneIssues model ClosedIssue milestone
+                        [ Request.Issue.listForMilestone model ClosedIssue milestone
                         , Request.Issue.list model Current
                         ]
 
@@ -1000,7 +1000,7 @@ update msg model =
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case milestone of
                     Just m ->
-                        [ fetchMilestoneIssues model OpenIssue m
+                        [ Request.Issue.listForMilestone model OpenIssue m
                         , Request.Issue.list model Current
                         ]
 
@@ -1013,7 +1013,7 @@ update msg model =
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case m of
                     Just m ->
-                        [ fetchMilestoneIssues model ClosedIssue m
+                        [ Request.Issue.listForMilestone model ClosedIssue m
                         , Request.Issue.list model Current
                         ]
 

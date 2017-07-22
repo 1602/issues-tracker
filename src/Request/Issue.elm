@@ -1,9 +1,10 @@
-module Request.Issue exposing (create, list)
+module Request.Issue exposing (create, list, listForMilestone)
 
 import Http exposing (Error, Response)
 import Data.Issue as Issue exposing (Issue)
+import Data.Milestone as Milestone exposing (Milestone)
 import Json.Decode exposing (Value)
-import Models exposing (Model, Column(..), Filter(..))
+import Models exposing (Model, Column(..), Filter(..), IssueState(..))
 import Date.Extra as Date exposing (Interval(..))
 import Messages exposing (Msg(..))
 import Services exposing (cachingFetch)
@@ -130,3 +131,81 @@ list model column =
             url
             model.etags
             (IssuesLoaded column)
+
+listForMilestone : Model -> IssueState -> Milestone -> Cmd Msg
+listForMilestone model issueState ms =
+    let
+        filter =
+            model.filter
+
+        repo =
+            model.repo
+
+        accessToken =
+            Maybe.withDefault "" model.accessToken
+
+        state =
+            case issueState of
+                OpenIssue ->
+                    "&state=open"
+
+                ClosedIssue ->
+                    "&state=closed"
+
+        filterByUser =
+            case filter of
+                CreatedBy user ->
+                    "&creator=" ++ user
+
+                AssignedTo user ->
+                    "&assignee=" ++ user
+
+                HasMentionOf user ->
+                    "&mentioned=" ++ user
+
+                All ->
+                    ""
+
+        pastMoment duration interval =
+            model.now
+                |> Date.add interval duration
+                |> Date.floor Hour
+                |> Date.toUtcIsoString
+                |> (++) "&since="
+
+        since =
+            case issueState of
+                ClosedIssue ->
+                    case model.settings.doneLimit of
+                        "a day" ->
+                            pastMoment -1 Day
+
+                        "a week" ->
+                            pastMoment -1 Week
+
+                        "two weeks" ->
+                            pastMoment -2 Week
+
+                        "a month" ->
+                            pastMoment -1 Month
+
+                        _ ->
+                            ""
+                OpenIssue ->
+                    ""
+        url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/issues?access_token="
+                ++ accessToken
+                ++ state
+                ++ "&sort=updated"
+                ++ "&milestone=" ++ ms.number
+                ++ filterByUser
+                ++ since
+    in
+        cachingFetch
+            url
+            model.etags
+            (MilestoneIssuesLoaded ms.number issueState)
+
