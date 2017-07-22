@@ -4,21 +4,22 @@ import Http exposing (Error, Response)
 import Data.Issue as Issue exposing (Issue)
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Decode exposing (Value)
-import Models exposing (Model, Column(..), Filter(..), IssueState(..))
+import Models exposing (Model, Filter(..), IssueState(..))
 import Date.Extra as Date exposing (Interval(..))
 import Messages exposing (Msg(..))
 import Request.Helpers exposing (cachingFetch, withAuthorization, apiUrl)
 import Json.Encode as Encode
 import HttpBuilder
+import Data.Column exposing (Column(..))
 
 
-create : String -> Maybe String -> Value -> (Result Error Issue -> a) -> Cmd a
+create : String -> String -> Value -> (Result Error Issue -> a) -> Cmd a
 create repo accessToken data onComplete =
     apiUrl ("/repos/" ++ repo ++ "/issues")
         |> HttpBuilder.post
         |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
         |> HttpBuilder.withBody (Http.jsonBody data)
-        |> withAuthorization (Maybe.withDefault "" accessToken)
+        |> withAuthorization accessToken
         |> HttpBuilder.toRequest
         |> Http.send onComplete
 
@@ -33,7 +34,7 @@ list model column =
             model.repo
 
         accessToken =
-            Maybe.withDefault "" model.accessToken
+            model.persistentData.accessToken
 
         milestone =
             case column of
@@ -96,7 +97,7 @@ list model column =
         since =
             case column of
                 Done ->
-                    case model.settings.doneLimit of
+                    case model.persistentData.doneLimit of
                         "a day" ->
                             pastMoment -1 Day
 
@@ -144,7 +145,7 @@ listForMilestone model issueState ms =
             model.repo
 
         accessToken =
-            Maybe.withDefault "" model.accessToken
+            model.persistentData.accessToken
 
         state =
             case issueState of
@@ -178,7 +179,7 @@ listForMilestone model issueState ms =
         since =
             case issueState of
                 ClosedIssue ->
-                    case model.settings.doneLimit of
+                    case model.persistentData.doneLimit of
                         "a day" ->
                             pastMoment -1 Day
 
@@ -228,9 +229,9 @@ update repo issueNumber issue accessToken onComplete =
 
 
 search : Model -> Cmd Msg
-search { repo, accessToken, searchTerms, etags } =
+search { repo, persistentData, searchTerms, etags } =
     cachingFetch
         (apiUrl <| "/search/issues?" ++ "q=repo:" ++ repo ++ " " ++ searchTerms)
-        (accessToken |> Maybe.withDefault "")
+        persistentData.accessToken
         etags
         IssuesSearchResults

@@ -9,6 +9,7 @@ import Navigation exposing (Location)
 import Data.Milestone exposing (Milestone)
 import Data.Issue exposing (Issue)
 import Data.User exposing (User)
+import Data.Column exposing (Column(..))
 
 type Msg
     = NoOp

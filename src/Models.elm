@@ -6,27 +6,17 @@ import Navigation exposing (Location)
 import Data.Issue exposing (Issue)
 import Data.Milestone exposing (Milestone)
 import Data.User exposing (User)
-
-
--- import Json.Decode as Decode
-
-
-type Column
-    = Current
-    | Backlog
-    | Icebox
-    | Done
-    | Search
+import Data.Column exposing (Column(..))
+import Data.PersistentData exposing (PersistentData)
 
 
 type IssueState = OpenIssue | ClosedIssue
 
+
 type alias Model =
-    { settings : Settings
-    , version : String
+    { version : String
     , user : Maybe User
     , token : String
-    , accessToken : Maybe String
     , repo : String
     , location : Location
     , now : Date.Date
@@ -44,16 +34,14 @@ type alias Model =
     , addIssueToColumn : Column
     , addIssueToMilestone : String
     , filter : Filter
-    , showColumns : List Column
-    , pinnedMilestones : Dict.Dict String String
     , filterStoriesBy : String
-    , recentRepos : List String
     , etags : Dict.Dict String (String, String)
     , searchTerms : String
     , searchResults : RemoteData (List Issue)
     , didSwitch : Bool
-    , savedSearches : Dict.Dict String String
+    , persistentData : PersistentData
     }
+
 
 type RemoteData a
     = NotRequested
@@ -65,18 +53,6 @@ type CachedData
     = CachedData String String String
     | NotCached String
 
-
-type alias PersistedData =
-    { accessToken : Maybe String
-    , savedSearches : List (String, String)
-    , pinnedMilestones : List (String, String)
-    , columns : List String
-    , defaultRepositoryType : String
-    , defaultRepository : String
-    , recentRepos : List String
-    , doneLimit : String
-    , powerOfNow : Bool
-    }
 
 type alias Settings =
     { defaultRepositoryType : String

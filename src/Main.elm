@@ -25,17 +25,12 @@ import Data.Milestone as Milestone
 import Request.Issue
 import Request.User
 import Request.Milestone
+import Data.PersistentData exposing (PersistentData)
+import Data.Column exposing (Column(..))
+import Json.Decode exposing (Value)
 
 
--- import Base exposing (..)
--- import Cruft exposing (clipboardIcon)
--- import Json.Encode as Encode
--- import List.Extra exposing (find)
--- import List.Extra exposing (groupBy)
--- APP
-
-
-main : Program ( PersistedData, String ) Model Msg
+main : Program Value Model Msg
 main =
     programWithFlags UrlChange
         { init = init
@@ -70,13 +65,14 @@ extractRepo hash =
 -- MODEL
 
 
-init : ( PersistedData, String ) -> Location -> ( Model, Cmd Msg )
-init ( persistentData, version ) location =
+init : Value -> Location -> ( Model, Cmd Msg )
+init initialData location =
     let
         page =
             parseHash location
 
-        a = Debug.log "persistent data" persistentData
+        needFocus =
+            highlightStory /= ""
 
         highlightStory =
             case page of
@@ -86,101 +82,83 @@ init ( persistentData, version ) location =
                 _ ->
                     ""
 
-        needFocus =
-            highlightStory /= ""
-
-
-        pinnedMilestones =
-            persistentData.pinnedMilestones
-                |> Dict.fromList
-
-        showColumns =
-            persistentData.columns
-                |> List.map
-                    (\s ->
-                        case s of
-                            "Current" ->
-                                Current
-
-                            "Done" ->
-                                Done
-
-                            "Icebox" ->
-                                Icebox
-
-                            "Search" ->
-                                Search
-
-                            _ ->
-                                Backlog
-                    )
-
-        initSettings x =
-            Models.Settings
-                x.defaultRepositoryType
-                x.defaultRepository
-                x.doneLimit
-                x.powerOfNow
-
-        recentRepos =
-            persistentData.recentRepos
-
-        settings =
-            initSettings persistentData
+        persistentData =
+            initialData
+                |> Decode.decodeValue Data.PersistentData.decoder
+                |> Result.toMaybe
+                |> Maybe.withDefault Data.PersistentData.default
 
         model =
             Model
-                settings
-                version
+                -- version
+                "1.1.1"
+                -- user
                 Nothing
+                -- token
                 ""
-                persistentData.accessToken
+                -- repo
                 (extractRepo location.hash)
+                -- location
                 location
+                -- now
                 (Date.fromTime <| Time.millisecond * (toFloat 0))
+                -- error
                 Nothing
+                -- current issues (backlog)
                 Nothing
+                -- icebox issues
                 Nothing
+                -- closed issues
                 Nothing
+                -- milestones
                 Dict.empty
+                -- pickMilestoneForIssue
                 Nothing
+                -- newIssueTitle
                 ""
+                -- highlightStory
                 highlightStory
+                -- newMilestoneTitle
                 ""
+                -- newIssueTitle
                 ""
+                -- needFocus
                 needFocus
+                -- addIssueToColumn
                 Done
+                -- addIssueToMilestone
                 ""
+                -- filter
                 All
-                showColumns
-                pinnedMilestones
+                -- filterStoriesBy
                 ""
-                recentRepos
+                -- etags
                 Dict.empty
+                -- searchTerms
                 ""
+                -- searchResults
                 NotRequested
-                True -- didSwitch
-                (Dict.fromList persistentData.savedSearches)
+                -- disSwitch
+                True
+                -- persistentData
+                persistentData
 
         defaultRepo =
-            if settings.defaultRepositoryType == "specified" then
-                if settings.defaultRepository == "" then
+            if persistentData.defaultRepositoryType == "specified" then
+                if persistentData.defaultRepository == "" then
                     Nothing
                 else
-                    Just settings.defaultRepository
+                    Just persistentData.defaultRepository
             else
                 -- last visited
-                List.head recentRepos
+                List.head persistentData.recentRepos
     in
         model
             ! ([ Task.perform CurrentDate Date.now
-               , case persistentData.accessToken of
-                    Just accessToken ->
-                        Request.User.get accessToken
-
-                    --fetchClients user.secretKey
-                    Nothing ->
-                        Cmd.none
+               , if persistentData.accessToken == "" then
+                    Cmd.none
+                 else
+                    Request.User.get persistentData.accessToken
                , case page of
                     Nothing ->
                         Navigation.modifyUrl <| "#/" ++ (Maybe.withDefault model.repo defaultRepo) ++ "/stories"
@@ -240,13 +218,13 @@ loadResource model =
             []
 
 
-port navigateToIssue : ((String, String) -> msg) -> Sub msg
+port navigateToIssue : (( String, String ) -> msg) -> Sub msg
 
 
 port googleAuth : (String -> msg) -> Sub msg
 
 
-port saveData : PersistedData -> Cmd msg
+port saveData : Value -> Cmd msg
 
 
 port clipboard : String -> Cmd msg
@@ -254,17 +232,9 @@ port clipboard : String -> Cmd msg
 
 updateLocalStorage : Model -> Cmd msg
 updateLocalStorage model =
-    saveData <|
-        PersistedData
-            model.accessToken
-            (Dict.toList model.savedSearches)
-            (Dict.toList model.pinnedMilestones)
-            (List.map toString model.showColumns)
-            model.settings.defaultRepositoryType
-            model.settings.defaultRepository
-            model.recentRepos
-            model.settings.doneLimit
-            model.settings.powerOfNow
+    model.persistentData
+        |> Data.PersistentData.encode
+        |> saveData
 
 
 
@@ -307,7 +277,7 @@ focus loc =
             Cmd.none
 
 
-updateSettings : SettingsMsg -> Settings -> Settings
+updateSettings : SettingsMsg -> PersistentData -> PersistentData
 updateSettings msg settings =
     case msg of
         IgnoreIdeas ->
@@ -335,17 +305,22 @@ update msg model =
 
         ToggleSaveSearch ->
             let
-                savedSearches s =
+                pd =
+                    model.persistentData
+
+                updatedSavedSearches =
                     if model.searchTerms == "" then
-                        s
+                        pd.savedSearches
+                    else if Dict.member model.searchTerms pd.savedSearches then
+                        Dict.remove model.searchTerms pd.savedSearches
                     else
-                        if Dict.member model.searchTerms s then
-                            Dict.remove model.searchTerms s
-                        else
-                            Dict.insert model.searchTerms model.searchTerms s
+                        Dict.insert model.searchTerms model.searchTerms pd.savedSearches
+
+                updatedPersistentData =
+                    { pd | savedSearches = updatedSavedSearches }
 
                 updatedModel =
-                    { model | savedSearches = savedSearches model.savedSearches }
+                    { model | persistentData = updatedPersistentData }
             in
                 updatedModel ! [ updateLocalStorage updatedModel ]
 
@@ -358,6 +333,7 @@ update msg model =
                     case issues of
                         Ok issues ->
                             { model | searchResults = Loaded issues }
+
                         Err e ->
                             { model | error = Just (toString e) }
             in
@@ -368,23 +344,23 @@ update msg model =
 
         SearchBy s ->
             let
-                updatedModel = { model | searchTerms = s }
+                updatedModel =
+                    { model | searchTerms = s }
             in
                 updatedModel ! [ Request.Issue.search updatedModel ]
 
         SearchIssues ->
-            model !
-                [ Request.Issue.search model ]
+            model
+                ! [ Request.Issue.search model ]
 
-        NavigateToIssue (repo, issueNumber) ->
-            model !
-                [ Navigation.modifyUrl <| "#/" ++ repo ++ "/stories/" ++ issueNumber ]
-
+        NavigateToIssue ( repo, issueNumber ) ->
+            model
+                ! [ Navigation.modifyUrl <| "#/" ++ repo ++ "/stories/" ++ issueNumber ]
 
         SettingsMsgProxy msg ->
             let
                 updatedModel =
-                    { model | settings = updateSettings msg model.settings }
+                    { model | persistentData = updateSettings msg model.persistentData }
             in
                 updatedModel ! [ updateLocalStorage updatedModel ]
 
@@ -395,7 +371,7 @@ update msg model =
                         CachedData url etag res ->
                             update (msg res)
                                 { model
-                                    | etags = Dict.insert url (etag, res) model.etags
+                                    | etags = Dict.insert url ( etag, res ) model.etags
                                 }
 
                         NotCached res ->
@@ -405,12 +381,13 @@ update msg model =
                     case e of
                         BadStatus res ->
                             let
-                                (etag, body) =
+                                ( etag, body ) =
                                     case Dict.get res.url model.etags of
-                                        Just (etag, body) ->
-                                            (etag, body)
+                                        Just ( etag, body ) ->
+                                            ( etag, body )
+
                                         Nothing ->
-                                            ("", "")
+                                            ( "", "" )
                             in
                                 if res.status.code == 304 && body /= "" then
                                     update (msg body) model
@@ -426,7 +403,7 @@ update msg model =
         PinMilestone s ->
             let
                 pinnedMilestone =
-                    model.pinnedMilestones
+                    model.persistentData.pinnedMilestones
                         |> Dict.get model.repo
                         |> Maybe.withDefault ""
 
@@ -436,12 +413,18 @@ update msg model =
                     else
                         s
 
-                updatedModel =
-                    { model
+                pd =
+                    model.persistentData
+
+                updatedPersistentData =
+                    { pd
                         | pinnedMilestones =
-                            model.pinnedMilestones
+                            pd.pinnedMilestones
                                 |> Dict.insert model.repo n
                     }
+
+                updatedModel =
+                    { model | persistentData = updatedPersistentData }
             in
                 updatedModel
                     ! (if n /= "" then
@@ -452,24 +435,37 @@ update msg model =
 
         HideColumn s ->
             let
-                updatedModel =
-                    { model
-                        | showColumns =
-                            model.showColumns
+                pd =
+                    model.persistentData
+
+                updatedPersistentData =
+                    { pd
+                        | columns =
+                            pd.columns
                                 |> List.filter ((/=) s)
                     }
+
+                updatedModel =
+                    { model | persistentData = updatedPersistentData }
             in
                 updatedModel ! [ updateLocalStorage updatedModel ]
 
         ReopenColumn s ->
             let
-                updatedModel =
-                    { model
-                        | showColumns =
-                            model.showColumns
+                pd =
+                    model.persistentData
+
+                updatedPersistentData =
+
+                    { pd
+                        | columns =
+                            pd.columns
                                 |> List.filter ((/=) s)
                                 |> (::) s
                     }
+
+                updatedModel =
+                    { model | persistentData = updatedPersistentData }
             in
                 updatedModel ! [ updateLocalStorage updatedModel ]
 
@@ -567,7 +563,7 @@ update msg model =
                     if model.newIssueTitle /= "" then
                         [ setFocus "create-story"
                         , StoryCreated col milestone
-                            |> Request.Issue.create model.repo model.accessToken encodedIssue
+                            |> Request.Issue.create model.repo model.persistentData.accessToken encodedIssue
                         ]
                     else
                         []
@@ -605,7 +601,7 @@ update msg model =
 
         CreateNewMilestone ->
             { model | newMilestoneTitle = "" }
-                ! [ Request.Milestone.create model.repo model.newMilestoneTitle model.accessToken
+                ! [ Request.Milestone.create model.repo model.newMilestoneTitle model.persistentData.accessToken
                   ]
 
         EditAccessToken s ->
@@ -621,17 +617,21 @@ update msg model =
                         updatedModel ! (loadResource updatedModel)
 
                 Err e ->
+                    let pd = model.persistentData
+                    in
                     case e of
                         NetworkError ->
-                            { model | error = Just (toString e) } ![]
+                            { model | error = Just (toString e) } ! []
 
                         _ ->
-                            { model | error = Just (toString e), accessToken = Nothing, user = Nothing } ! []
+                            { model | error = Just (toString e), persistentData = { pd | accessToken = "" }, user = Nothing } ! []
 
         SaveAccessToken ->
             let
-                updatedModel =
-                    { model | accessToken = Just model.token }
+                pd = model.persistentData
+                upd =
+                    { pd | accessToken = model.token }
+                updatedModel = { model | persistentData = upd }
             in
                 if model.token == "" then
                     model ! [ Navigation.load "https://github.com/settings/tokens" ]
@@ -670,7 +670,7 @@ update msg model =
 
                 prependNewRepositoryToRecent =
                     newRepository
-                        :: (model.recentRepos
+                        :: (model.persistentData.recentRepos
                                 |> List.filter ((/=) newRepository)
                                 |> List.take 19
                            )
@@ -682,15 +682,18 @@ update msg model =
 
                         _ ->
                             ""
+
                 needFocus =
                     (highlightStory /= "") && (highlightStory /= model.highlightStory)
 
-
                 recentRepos =
                     if didSwitch then
-                         model.recentRepos
+                        model.persistentData.recentRepos
                     else
-                         prependNewRepositoryToRecent
+                        prependNewRepositoryToRecent
+
+                pd =
+                    model.persistentData
 
                 updatedModel =
                     { model
@@ -699,14 +702,17 @@ update msg model =
                         , repo = newRepository
                         , needFocus = Debug.log "need focus" needFocus
                         , highlightStory = highlightStory
-                        , recentRepos = recentRepos
+                        , persistentData = { pd | recentRepos = recentRepos }
                     }
             in
-                updatedModel ! (loadResource updatedModel
-                            ++ (if needFocus then
+                updatedModel
+                    ! (loadResource updatedModel
+                        ++ (if needFocus then
                                 [ focus <| Debug.log "loc" location ]
-                                else
-                                    []))
+                            else
+                                []
+                           )
+                      )
 
         MilestoneIssuesLoaded num issueState issuesJson ->
             let
@@ -750,18 +756,20 @@ update msg model =
                         Nothing ->
                             Nothing
 
-                updatedMilestones = Dict.update model.repo (\milestones ->
-                        Just
-                            (Maybe.withDefault Dict.empty milestones
-                                |> Dict.update num (updateMilestoneIssues <| issues issuesJson)
-                            )
-                    ) model.milestones
+                updatedMilestones =
+                    Dict.update model.repo
+                        (\milestones ->
+                            Just
+                                (Maybe.withDefault Dict.empty milestones
+                                    |> Dict.update num (updateMilestoneIssues <| issues issuesJson)
+                                )
+                        )
+                        model.milestones
 
                 updatedModel =
-                            { model
-                                | milestones = updatedMilestones
-                            }
-
+                    { model
+                        | milestones = updatedMilestones
+                    }
 
                 mss =
                     case Dict.get model.repo updatedModel.milestones of
@@ -823,11 +831,11 @@ update msg model =
                     Ok milestones ->
                         let
                             recentRepos =
-                                if (Maybe.withDefault "" <| List.head model.recentRepos) == model.repo then
-                                    model.recentRepos
+                                if (Maybe.withDefault "" <| List.head model.persistentData.recentRepos) == model.repo then
+                                    model.persistentData.recentRepos
                                 else
                                     model.repo
-                                        :: (model.recentRepos
+                                        :: (model.persistentData.recentRepos
                                                 |> List.filter ((/=) model.repo)
                                                 |> List.take 19
                                            )
@@ -836,7 +844,7 @@ update msg model =
                                 milestones
                                     |> List.filter
                                         (\ms ->
-                                            not model.settings.powerOfNow || (ms.dueOn /= Nothing)
+                                            not model.persistentData.powerOfNow || (ms.dueOn /= Nothing)
                                         )
                                     |> List.foldl
                                         (\ms ->
@@ -864,16 +872,17 @@ update msg model =
                                         )
                                         (Dict.get model.repo model.milestones |> Maybe.withDefault Dict.empty)
 
+                            pd = model.persistentData
+
                             updatedModel =
                                 { model
                                     | milestones = Dict.insert model.repo updatedMilestones model.milestones
-                                    , recentRepos = recentRepos
+                                    , persistentData = { pd | recentRepos = recentRepos }
                                     , error = Nothing
                                 }
                         in
                             updatedModel
-                                ! (case model.accessToken of
-                                    Just token ->
+                                ! (if model.persistentData.accessToken /= "" then
                                         (updateLocalStorage updatedModel)
                                             :: (updatedMilestones
                                                     |> Dict.values
@@ -888,7 +897,7 @@ update msg model =
                                                     |> List.map (Request.Issue.listForMilestone model ClosedIssue)
                                                )
 
-                                    Nothing ->
+                                    else
                                         []
                                   )
 
@@ -897,12 +906,13 @@ update msg model =
                 Ok _ ->
                     let
                         s =
-                            model.settings
+                            model.persistentData
                     in
                         { model
-                            | error = Nothing
-                            -- TODO get rid of hack by applying powerOfNow setting on a view level (and separating list on issues with the list of milestones)
-                            , settings = { s | powerOfNow = False }
+                            | error =
+                                Nothing
+                                -- TODO get rid of hack by applying powerOfNow setting on a view level (and separating list on issues with the list of milestones)
+                            , persistentData = { s | powerOfNow = False }
                         }
                             ! [ Request.Milestone.list model
                               ]
@@ -943,6 +953,7 @@ update msg model =
 
                     _ ->
                         model ! []
+
         CopyText str ->
             model ! [ clipboard str ]
 
@@ -953,30 +964,29 @@ update msg model =
                   ]
 
         SetMilestone issue milestone ->
-            case model.accessToken of
-                Just token ->
-                    { model
-                        | pickMilestoneForIssue = Nothing
-                        , lockedIssueNumber = issue.number
-                    }
-                        ! [ Request.Issue.update model.repo
-                                issue.number
-                                (Encode.object
-                                    [ ( "milestone"
-                                      , milestone.number
-                                            |> String.toInt
-                                            |> Result.toMaybe
-                                            |> Maybe.withDefault 0
-                                            |> Encode.int
-                                      )
-                                    ]
-                                )
-                                token
-                                (MilestoneSet milestone)
-                          ]
+            if model.persistentData.accessToken /= "" then
+                { model
+                    | pickMilestoneForIssue = Nothing
+                    , lockedIssueNumber = issue.number
+                }
+                    ! [ Request.Issue.update model.repo
+                            issue.number
+                            (Encode.object
+                                [ ( "milestone"
+                                  , milestone.number
+                                        |> String.toInt
+                                        |> Result.toMaybe
+                                        |> Maybe.withDefault 0
+                                        |> Encode.int
+                                  )
+                                ]
+                            )
+                            model.persistentData.accessToken
+                            (MilestoneSet milestone)
+                      ]
 
-                Nothing ->
-                    model ! []
+            else
+                model ! []
 
         MilestoneSet m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
@@ -1027,8 +1037,7 @@ update msg model =
             { model | pickMilestoneForIssue = Nothing } ! []
 
         IssueAction issue action ->
-            case model.accessToken of
-                Just token ->
+            if model.persistentData.accessToken /= "" then
                     case action of
                         "unplan" ->
                             case issue.milestone of
@@ -1038,7 +1047,7 @@ update msg model =
                                                 |> Request.Issue.update model.repo
                                                     issue.number
                                                     (Encode.object [ ( "milestone", Encode.null ) ])
-                                                    token
+                                                    model.persistentData.accessToken
                                           ]
 
                                 Nothing ->
@@ -1065,7 +1074,7 @@ update msg model =
                                                       )
                                                     ]
                                                 )
-                                                token
+                                                model.persistentData.accessToken
                                                 (IssueStarted issue.milestone)
                                           ]
 
@@ -1088,7 +1097,7 @@ update msg model =
                                             , ( "state", Encode.string "closed" )
                                             ]
                                         )
-                                        token
+                                        model.persistentData.accessToken
                                         (IssueFinished issue.milestone)
                                   ]
 
@@ -1109,7 +1118,7 @@ update msg model =
                                             , ( "state", Encode.string "open" )
                                             ]
                                         )
-                                        token
+                                        model.persistentData.accessToken
                                         (IssueRestarted issue.milestone)
                                   ]
 
@@ -1136,7 +1145,7 @@ update msg model =
                                               )
                                             ]
                                         )
-                                        token
+                                        model.persistentData.accessToken
                                         (IssueStarted issue.milestone)
                                   ]
 
@@ -1157,7 +1166,7 @@ update msg model =
                                               )
                                             ]
                                         )
-                                        token
+                                        model.persistentData.accessToken
                                         UrgentIssueAdded
                                   ]
 
@@ -1175,14 +1184,14 @@ update msg model =
                                               )
                                             ]
                                         )
-                                        token
+                                        model.persistentData.accessToken
                                         UrgentIssueAdded
                                   ]
 
                         _ ->
                             model ! []
 
-                Nothing ->
+                else
                     model ! []
 
 
@@ -1281,29 +1290,25 @@ view model =
                 , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
                 ]
     in
-        div [ style [ ( "display", "flex" ) ] ]
-            <|
-                [ viewNavigation model.user model
-                , viewPage model.user model <| parseHash model.location
-                , error
-                , model.pickMilestoneForIssue
-                    |> Maybe.andThen (pickMilestoneModal >> Just)
-                    |> Maybe.withDefault (text "")
-                , case model.accessToken of
-                    Just _ ->
-                        text ""
-
-                    Nothing ->
-                        div [] [ text "cheers. visit "
-                        , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
-                        , text " (we need 'repo' access granted to see all private repositories)"
-                        , Html.br [] []
-                        , text "and fill this input "
-                        , Html.input [ onInput EditAccessToken ] []
-                        , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
-                        ]
-                ]
-
+        div [ style [ ( "display", "flex" ) ] ] <|
+            [ viewNavigation model.user model
+            , if model.persistentData.accessToken == "" then
+                viewPage model.user model <| parseHash model.location
+              else
+                div []
+                    [ text "cheers. visit "
+                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
+                    , text " (we need 'repo' access granted to see all private repositories)"
+                    , Html.br [] []
+                    , text "and fill this input "
+                    , Html.input [ onInput EditAccessToken ] []
+                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
+                    ]
+            , error
+            , model.pickMilestoneForIssue
+                |> Maybe.andThen (pickMilestoneModal >> Just)
+                |> Maybe.withDefault (text "")
+            ]
 
 
 viewPage : Maybe User -> Model -> Maybe Route -> Html Msg
@@ -1480,11 +1485,11 @@ viewPage user model route =
                 ( icon, title, comment ) =
                     columnTitle col
             in
-                if List.member col model.showColumns then
+                if List.member col model.persistentData.columns then
                     Html.section
                         [ style
                             [ ( "width"
-                              , case List.length model.showColumns of
+                              , case List.length model.persistentData.columns of
                                     3 ->
                                         "calc(33.33% - 5px)"
 
@@ -1509,6 +1514,7 @@ viewPage user model route =
                             , case colHtml of
                                 Just html ->
                                     html
+
                                 Nothing ->
                                     text ""
                             , span
@@ -1549,53 +1555,67 @@ viewPage user model route =
                     , ( "overflow-y", "hidden" )
                     ]
                 ]
-                [ column Search (
-                   Just <|
-                   Html.form [ class "search-issue", style [ ("display", "inline-block" ), ("width","calc(100% - 128px)")], Html.Events.onSubmit SearchIssues ]
-                       [ Html.input [class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
-                       , case model.searchResults of
-                            Loaded issues ->
-                               Html.span [ class "clear-search", onClick ClearSearch ] [ text "×" ]
-                            _ ->
-                                text ""
-                       , if model.searchTerms /= "" then
-                           case model.searchResults of
-                               Loaded issues ->
-                                   Html.span [ class (if Dict.member model.searchTerms model.savedSearches then "saved-search" else "not-saved-search"), onClick ToggleSaveSearch ] [ text "⭐" ]
-                               _ ->
+                [ column Search
+                    (Just <|
+                        Html.form [ class "search-issue", style [ ( "display", "inline-block" ), ( "width", "calc(100% - 128px)" ) ], Html.Events.onSubmit SearchIssues ]
+                            [ Html.input [ class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
+                            , case model.searchResults of
+                                Loaded issues ->
+                                    Html.span [ class "clear-search", onClick ClearSearch ] [ text "×" ]
+
+                                _ ->
                                     text ""
-                        else
-                            text ""
-                       ]
-                    ) (Just <|
-                   case model.searchResults of
-                        NotRequested ->
-                            div []
-                                [ Html.a
-                                    [ cellStyle "calc(100% - 10px)"
-                                    , Attrs.target "_blank"
-                                    , Attrs.href "https://help.github.com/articles/searching-issues/#search-within-a-users-or-organizations-repositories"
-                                    ] [ text "Github search documentation" ]
-                                , Html.ul []
-                                    <| (
-                                        model.savedSearches
+                            , if model.searchTerms /= "" then
+                                case model.searchResults of
+                                    Loaded issues ->
+                                        Html.span
+                                            [ class
+                                                (if Dict.member model.searchTerms model.persistentData.savedSearches then
+                                                    "saved-search"
+                                                 else
+                                                    "not-saved-search"
+                                                )
+                                            , onClick ToggleSaveSearch
+                                            ]
+                                            [ text "⭐" ]
+
+                                    _ ->
+                                        text ""
+                              else
+                                text ""
+                            ]
+                    )
+                    (Just <|
+                        case model.searchResults of
+                            NotRequested ->
+                                div []
+                                    [ Html.a
+                                        [ cellStyle "calc(100% - 10px)"
+                                        , Attrs.target "_blank"
+                                        , Attrs.href "https://help.github.com/articles/searching-issues/#search-within-a-users-or-organizations-repositories"
+                                        ]
+                                        [ text "Github search documentation" ]
+                                    , Html.ul [] <|
+                                        (model.persistentData.savedSearches
                                             |> Dict.values
-                                            |> List.map (\search ->
-                                                Html.li [ onClick <| SearchBy search] [ text search ]
-                                            )
-                                    )
-                                ]
+                                            |> List.map
+                                                (\search ->
+                                                    Html.li [ onClick <| SearchBy search ] [ text search ]
+                                                )
+                                        )
+                                    ]
 
-                        Loading ->
-                            text "Loading..."
+                            Loading ->
+                                text "Loading..."
 
-                        Loaded issues ->
-                            displayIssuesGroupedByDate
-                                issues
-                                Icebox
-                                |> div []
-                )
-                , column Icebox Nothing
+                            Loaded issues ->
+                                displayIssuesGroupedByDate
+                                    issues
+                                    Icebox
+                                    |> div []
+                    )
+                , column Icebox
+                    Nothing
                     (model.iceboxIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1606,7 +1626,8 @@ viewPage user model route =
                                     |> Just
                             )
                     )
-                , column Backlog Nothing
+                , column Backlog
+                    Nothing
                     (model.iceboxIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1634,7 +1655,8 @@ viewPage user model route =
                                         Nothing
                             )
                     )
-                , column Current Nothing
+                , column Current
+                    Nothing
                     (model.currentIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1643,7 +1665,8 @@ viewPage user model route =
                                     |> Just
                             )
                     )
-                , column Done Nothing
+                , column Done
+                    Nothing
                     (model.closedIssues
                         |> Maybe.andThen
                             (\issues ->
@@ -1706,6 +1729,7 @@ columnTitle col =
         Done ->
             ( "🎉", "Done", "(closed issues)" )
 
+
 viewSettings : Model -> Html SettingsMsg
 viewSettings model =
     let
@@ -1716,36 +1740,36 @@ viewSettings model =
             values
                 |> List.map (option currentValue)
 
-        option current value  =
+        option current value =
             Html.option [ Attrs.selected <| value == current ] [ text value ]
 
         settingsBlock title contents =
             div [ style [ ( "background", "#333" ), ( "border", "1px solid #555" ), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
     in
-        Html.main_ [ style [ ( "padding", "10px" ), ( "overflow-y", "auto" ), ( "height", "100vh" ), ( "width", "100vw") ] ]
+        Html.main_ [ style [ ( "padding", "10px" ), ( "overflow-y", "auto" ), ( "height", "100vh" ), ( "width", "100vw" ) ] ]
             -- default repo
             [ settingsBlock "Default repository"
-                [ select ChangeDefaultRepositoryType [ "last visited", "specified" ] model.settings.defaultRepositoryType
-                , if model.settings.defaultRepositoryType == "specified" then
-                    Html.input [ Attrs.value model.settings.defaultRepository, onInput UpdateDefaultRepository ] []
+                [ select ChangeDefaultRepositoryType [ "last visited", "specified" ] model.persistentData.defaultRepositoryType
+                , if model.persistentData.defaultRepositoryType == "specified" then
+                    Html.input [ Attrs.value model.persistentData.defaultRepository, onInput UpdateDefaultRepository ] []
                   else
                     text ""
                 , Html.p [] [ text "this setting controls repository which will be opened when visiting the kanban app" ]
                 ]
               -- limit
             , settingsBlock "Limit for 'We just did it'"
-                [ select ChangeDoneLimit [ "a day",  "a week", "two weeks", "a month" ] model.settings.doneLimit
+                [ select ChangeDoneLimit [ "a day", "a week", "two weeks", "a month" ] model.persistentData.doneLimit
                 , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
                 ]
               -- focused mode: ignore milestones with no due date
             , settingsBlock "Focus on present, ignore ideas"
                 [ Html.label []
-                    [ Html.input [ Attrs.checked model.settings.powerOfNow, Attrs.type_ "checkbox", onClick IgnoreIdeas ] []
+                    [ Html.input [ Attrs.checked model.persistentData.powerOfNow, Attrs.type_ "checkbox", onClick IgnoreIdeas ] []
                     , text " ignore milestones with no due date"
                     ]
                 , Html.p []
                     [ text <|
-                        (if model.settings.powerOfNow then
+                        (if model.persistentData.powerOfNow then
                             "keep this box ticked"
                          else
                             "tick this box"
@@ -1764,7 +1788,7 @@ listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState ->
 listIssuesWithinMilestones milestones issueState now model =
     let
         pinnedMilestoneNumber =
-            model.pinnedMilestones
+            model.persistentData.pinnedMilestones
                 |> Dict.get model.repo
                 |> Maybe.withDefault ""
 
@@ -2022,7 +2046,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                             , div [ Attrs.class "buttons" ] <|
                                 case col of
                                     Search ->
-                                        [ ]
+                                        []
 
                                     Backlog ->
                                         [ button issue "unplan", button issue "start" ]
@@ -2207,13 +2231,16 @@ textareaStyle =
 viewNavigation : Maybe User -> Model -> Html Msg
 viewNavigation user model =
     let
+        showColumns =
+            model.persistentData.columns
+
         issuesSubnav =
             []
-                |> reopeningColumnButton Done model.showColumns
-                |> reopeningColumnButton Current model.showColumns
-                |> reopeningColumnButton Backlog model.showColumns
-                |> reopeningColumnButton Icebox model.showColumns
-                |> reopeningColumnButton Search model.showColumns
+                |> reopeningColumnButton Done showColumns
+                |> reopeningColumnButton Current showColumns
+                |> reopeningColumnButton Backlog showColumns
+                |> reopeningColumnButton Icebox showColumns
+                |> reopeningColumnButton Search showColumns
                 |> div []
 
         activePage =
@@ -2234,6 +2261,7 @@ viewNavigation user model =
 
                 Just (IssuesIndex _ _) ->
                     issuesSubnav
+
                 _ ->
                     text ""
 
@@ -2245,7 +2273,12 @@ viewNavigation user model =
                 , ( "margin", "0" )
                 , ( "margin-bottom", "10px" )
                 , ( "font-weight", "700" )
-                , ( "background", if isActive then "rgb(246,246,247)" else "rgba(255,255,255, 0.1)" )
+                , ( "background"
+                  , if isActive then
+                        "rgb(246,246,247)"
+                    else
+                        "rgba(255,255,255, 0.1)"
+                  )
                 , ( "color", "black" )
                 , ( "font-size", "20px" )
                 , ( "width", "30px" )
@@ -2296,9 +2329,10 @@ viewNavigation user model =
                 [ case user of
                     Nothing ->
                         text ""
+
                     Just user ->
-                        Html.li [ menuListItemStyle isSettingsActive ] [
-                            Html.a
+                        Html.li [ menuListItemStyle isSettingsActive ]
+                            [ Html.a
                                 [ Attrs.href <| "#/" ++ model.repo ++ "/settings"
                                 , style
                                     [ ( "display", "inline-block" )
@@ -2309,9 +2343,10 @@ viewNavigation user model =
                                     [ src user.avatar
                                     , Attrs.width 24
                                     , style [ ( "vertical-align", "middle" ) ]
-                                    ] []
-                     ]
-                ]
+                                    ]
+                                    []
+                                ]
+                            ]
                 ]
             , [ viewLink "stories" (text "🔬")
               , viewLink "milestones" (text "🔭")
@@ -2326,63 +2361,83 @@ viewNavigation user model =
                         , ( "margin-bottom", "20px" )
                         ]
                     ]
-                    {-
-            , text " Show stories: "
-            , Html.select
-                [ onInput ChangeFilter
-                , Attrs.value
-                    (case model.filter of
-                        AssignedTo _ ->
-                            "assigned to me"
+              {-
+                 , text " Show stories: "
+                 , Html.select
+                     [ onInput ChangeFilter
+                     , Attrs.value
+                         (case model.filter of
+                             AssignedTo _ ->
+                                 "assigned to me"
 
-                        CreatedBy _ ->
-                            "created by me"
+                             CreatedBy _ ->
+                                 "created by me"
 
-                        HasMentionOf _ ->
-                            "mentioning me"
+                             HasMentionOf _ ->
+                                 "mentioning me"
 
-                        All ->
-                            "all"
-                    )
-                ]
-                [ Html.option [] [ text "all" ]
-                , Html.option [] [ text "assigned to me" ]
-                , Html.option [] [ text "created by me" ]
-                , Html.option [] [ text "mentioning me" ]
-                ]
-                --}
+                             All ->
+                                 "all"
+                         )
+                     ]
+                     [ Html.option [] [ text "all" ]
+                     , Html.option [] [ text "assigned to me" ]
+                     , Html.option [] [ text "created by me" ]
+                     , Html.option [] [ text "mentioning me" ]
+                     ]
+                     -
+              -}
             , subNav
-            --, text " Filter stories: "
-            --, Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
+              --, text " Filter stories: "
+              --, Html.input [ Attrs.value model.filterStoriesBy, onInput FilterStories ] []
             ]
 
 
 reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
 reopeningColumnButton col showColumns list =
     let
-        (icon, title, _) = columnTitle col
+        ( icon, title, _ ) =
+            columnTitle col
     in
         if List.member col showColumns then
-            (Html.button [
-                style (buttonStyle |> List.filter (\( s, _ ) -> s /= "margin-top")
-                |> (++)
-                    [ ( "font-size", "18px" )
-                    , ("height", "30px" )
-                    , ( "width", "30px" )
-                    , ( "margin-top", "10px" )
-                    , ( "transition", "filter 0.1s, background 0.1s" )
-                    ] ), onClick <| HideColumn col ] [ text <| icon ]) :: list
+            (Html.button
+                [ style
+                    (buttonStyle
+                        |> List.filter (\( s, _ ) -> s /= "margin-top")
+                        |> (++)
+                            [ ( "font-size", "18px" )
+                            , ( "height", "30px" )
+                            , ( "width", "30px" )
+                            , ( "margin-top", "10px" )
+                            , ( "transition", "filter 0.1s, background 0.1s" )
+                            ]
+                    )
+                , onClick <| HideColumn col
+                ]
+                [ text <| icon ]
+            )
+                :: list
         else
-            (Html.button [
-                style (buttonStyle |> List.filter (\( s, _ ) ->
-                    s /= "margin-top" && s /= "background" && s /= "color" )
-                |> (++)
-                    [ ( "font-size", "18px" )
-                    , ( "background", "rgba(40,40,40,1)" )
-                    , ( "color", "#bbb" )
-                    , ( "transition", "filter 0.1s, background 0.1s" )
-                    , ( "filter", "grayscale(0.9) brightness(50%)" )
-                    , ( "height", "30px" )
-                    , ( "width", "30px" ), ( "margin-top", "10px" ) ] ), onClick <| ReopenColumn col ] [ text <| icon ]) :: list
-
-
+            (Html.button
+                [ style
+                    (buttonStyle
+                        |> List.filter
+                            (\( s, _ ) ->
+                                s /= "margin-top" && s /= "background" && s /= "color"
+                            )
+                        |> (++)
+                            [ ( "font-size", "18px" )
+                            , ( "background", "rgba(40,40,40,1)" )
+                            , ( "color", "#bbb" )
+                            , ( "transition", "filter 0.1s, background 0.1s" )
+                            , ( "filter", "grayscale(0.9) brightness(50%)" )
+                            , ( "height", "30px" )
+                            , ( "width", "30px" )
+                            , ( "margin-top", "10px" )
+                            ]
+                    )
+                , onClick <| ReopenColumn col
+                ]
+                [ text <| icon ]
+            )
+                :: list

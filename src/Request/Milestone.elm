@@ -10,7 +10,7 @@ import HttpBuilder exposing (withExpect, withBody)
 import Util exposing ((=>))
 
 
-create : String -> String -> Maybe String -> Cmd Msg
+create : String -> String -> String -> Cmd Msg
 create repo title accessToken =
     let
         body =
@@ -21,7 +21,7 @@ create repo title accessToken =
     in
         apiUrl ("/repos/" ++ repo ++ "/milestones")
             |> HttpBuilder.post
-            |> withAuthorization (Maybe.withDefault "" accessToken)
+            |> withAuthorization accessToken
             |> withExpect (Http.expectJson Milestone.decoder)
             |> withBody body
             |> HttpBuilder.toRequest
@@ -32,6 +32,6 @@ list : Model -> Cmd Msg
 list model =
     cachingFetch
         (apiUrl <| "/repos/" ++ model.repo ++ "/milestones")
-        (Maybe.withDefault "" model.accessToken)
+        model.persistentData.accessToken
         model.etags
         LoadMilestones
