@@ -3,7 +3,6 @@ port module Main exposing (..)
 import Route exposing (Route, Route(..), parseHash)
 import Models exposing (..)
 import Messages exposing (..)
-import Services exposing (..)
 import Dict
 import List
 import Html exposing (Html, span, text, img, div)
@@ -24,6 +23,8 @@ import Data.Issue as Issue exposing (Issue)
 import Data.User as User exposing (User)
 import Data.Milestone as Milestone
 import Request.Issue
+import Request.User
+import Request.Milestone
 
 
 -- import Base exposing (..)
@@ -175,7 +176,7 @@ init ( persistentData, version ) location =
             ! ([ Task.perform CurrentDate Date.now
                , case persistentData.accessToken of
                     Just accessToken ->
-                        fetchUser accessToken
+                        Request.User.get accessToken
 
                     --fetchClients user.secretKey
                     Nothing ->
@@ -209,7 +210,7 @@ loadAllIssues model =
         [ Request.Issue.list model Current
         , Request.Issue.list model Icebox
         , Request.Issue.list model Done
-        , fetchMilestones model
+        , Request.Milestone.list model
         ]
     else
         []
@@ -369,11 +370,11 @@ update msg model =
             let
                 updatedModel = { model | searchTerms = s }
             in
-                updatedModel ! [ searchIssues updatedModel ]
+                updatedModel ! [ Request.Issue.search updatedModel ]
 
         SearchIssues ->
             model !
-                [ searchIssues model ]
+                [ Request.Issue.search model ]
 
         NavigateToIssue (repo, issueNumber) ->
             model !
@@ -604,7 +605,7 @@ update msg model =
 
         CreateNewMilestone ->
             { model | newMilestoneTitle = "" }
-                ! [ createMilestone model.repo model.newMilestoneTitle model.accessToken
+                ! [ Request.Milestone.create model.repo model.newMilestoneTitle model.accessToken
                   ]
 
         EditAccessToken s ->
@@ -635,7 +636,7 @@ update msg model =
                 if model.token == "" then
                     model ! [ Navigation.load "https://github.com/settings/tokens" ]
                 else
-                    updatedModel ! ([ fetchUser model.token, updateLocalStorage updatedModel ] ++ (loadResource updatedModel))
+                    updatedModel ! ([ Request.User.get model.token, updateLocalStorage updatedModel ] ++ (loadResource updatedModel))
 
         CurrentDate now ->
             { model | now = now } ! []
@@ -903,7 +904,7 @@ update msg model =
                             -- TODO get rid of hack by applying powerOfNow setting on a view level (and separating list on issues with the list of milestones)
                             , settings = { s | powerOfNow = False }
                         }
-                            ! [ fetchMilestones model
+                            ! [ Request.Milestone.list model
                               ]
 
                 Err e ->
@@ -958,7 +959,7 @@ update msg model =
                         | pickMilestoneForIssue = Nothing
                         , lockedIssueNumber = issue.number
                     }
-                        ! [ updateIssueWith model.repo
+                        ! [ Request.Issue.update model.repo
                                 issue.number
                                 (Encode.object
                                     [ ( "milestone"
@@ -1034,7 +1035,7 @@ update msg model =
                                 Just m ->
                                     { model | lockedIssueNumber = issue.number }
                                         ! [ UnsetMilestone m
-                                                |> updateIssueWith model.repo
+                                                |> Request.Issue.update model.repo
                                                     issue.number
                                                     (Encode.object [ ( "milestone", Encode.null ) ])
                                                     token
@@ -1047,7 +1048,7 @@ update msg model =
                             case model.user of
                                 Just user ->
                                     { model | lockedIssueNumber = issue.number }
-                                        ! [ updateIssueWith model.repo
+                                        ! [ Request.Issue.update model.repo
                                                 issue.number
                                                 (Encode.object
                                                     [ ( "labels"
@@ -1073,7 +1074,7 @@ update msg model =
 
                         "finish" ->
                             { model | lockedIssueNumber = issue.number }
-                                ! [ updateIssueWith model.repo
+                                ! [ Request.Issue.update model.repo
                                         issue.number
                                         (Encode.object
                                             [ ( "labels"
@@ -1093,7 +1094,7 @@ update msg model =
 
                         "restart" ->
                             { model | lockedIssueNumber = issue.number }
-                                ! [ updateIssueWith model.repo
+                                ! [ Request.Issue.update model.repo
                                         issue.number
                                         (Encode.object
                                             [ ( "labels"
@@ -1114,7 +1115,7 @@ update msg model =
 
                         "unstart" ->
                             { model | lockedIssueNumber = issue.number }
-                                ! [ updateIssueWith model.repo
+                                ! [ Request.Issue.update model.repo
                                         issue.number
                                         (Encode.object
                                             [ ( "labels"
@@ -1144,7 +1145,7 @@ update msg model =
 
                         "ice" ->
                             model
-                                ! [ updateIssueWith model.repo
+                                ! [ Request.Issue.update model.repo
                                         issue.number
                                         (Encode.object
                                             [ ( "labels"
@@ -1162,7 +1163,7 @@ update msg model =
 
                         "just do it" ->
                             model
-                                ! [ updateIssueWith model.repo
+                                ! [ Request.Issue.update model.repo
                                         issue.number
                                         (Encode.object
                                             [ ( "labels"

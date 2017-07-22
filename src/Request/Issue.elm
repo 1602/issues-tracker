@@ -1,4 +1,4 @@
-module Request.Issue exposing (create, list, listForMilestone)
+module Request.Issue exposing (create, list, listForMilestone, update, search)
 
 import Http exposing (Error, Response)
 import Data.Issue as Issue exposing (Issue)
@@ -7,7 +7,8 @@ import Json.Decode exposing (Value)
 import Models exposing (Model, Column(..), Filter(..), IssueState(..))
 import Date.Extra as Date exposing (Interval(..))
 import Messages exposing (Msg(..))
-import Services exposing (cachingFetch)
+import Request.Helpers exposing (cachingFetch)
+import Json.Encode as Encode
 
 create : String -> Maybe String -> Value -> (Result Error Issue -> a) -> Cmd a
 create repo accessToken data onComplete =
@@ -209,3 +210,36 @@ listForMilestone model issueState ms =
             model.etags
             (MilestoneIssuesLoaded ms.number issueState)
 
+
+update : String -> String -> Encode.Value -> String -> (Result Error Issue -> a) -> Cmd a
+update repo issueNumber issue accessToken onComplete =
+    Http.request
+        { method = "PATCH"
+        , headers = []
+        , url =
+            "https://api.github.com/repos/"
+                ++ repo
+                ++ "/issues/"
+                ++ issueNumber
+                ++ "?access_token="
+                ++ accessToken
+        , expect = Http.expectJson Issue.decoder
+        , body = Http.jsonBody issue
+        , timeout = Nothing
+        , withCredentials = False
+        }
+        |> Http.send onComplete
+
+
+search : Model -> Cmd Msg
+search { repo, accessToken, searchTerms, etags } =
+    let
+        url =
+            "https://api.github.com/search/issues?access_token="
+                ++ (Maybe.withDefault "" accessToken)
+                ++ "&q=repo:" ++ repo ++ " " ++ searchTerms
+    in
+        cachingFetch
+            url
+            etags
+            IssuesSearchResults
