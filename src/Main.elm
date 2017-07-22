@@ -2,7 +2,6 @@ port module Main exposing (..)
 
 import Route exposing (Route, Route(..), parseHash)
 import Models exposing (..)
-import Decoders exposing (issueDecoder, milestoneDecoder)
 import Messages exposing (..)
 import Services exposing (..)
 import Dict
@@ -21,6 +20,9 @@ import Dom
 import Date.Extra
 import Json.Decode as Decode
 import GithubMarkdown exposing (ghMd)
+import Data.Issue as Issue exposing (Issue)
+import Data.User as User exposing (User)
+import Data.Milestone as Milestone
 
 
 -- import Base exposing (..)
@@ -348,7 +350,7 @@ update msg model =
         IssuesSearchResults issuesJson ->
             let
                 issues =
-                    Decode.decodeString (Decode.at [ "items" ] <| Decode.list issueDecoder) issuesJson
+                    Decode.decodeString (Decode.at [ "items" ] <| Decode.list Issue.decoder) issuesJson
 
                 updatedModel =
                     case issues of
@@ -707,7 +709,7 @@ update msg model =
         MilestoneIssuesLoaded num issueState issuesJson ->
             let
                 issues json =
-                    Decode.decodeString (Decode.list issueDecoder) json
+                    Decode.decodeString (Decode.list Issue.decoder) json
                         |> Result.toMaybe
                         |> Maybe.withDefault []
 
@@ -810,7 +812,7 @@ update msg model =
             let
                 result =
                     milestonesJson
-                        |> Decode.decodeString (Decode.list milestoneDecoder)
+                        |> Decode.decodeString (Decode.list Milestone.decoder)
             in
                 case result of
                     Err error ->
@@ -909,7 +911,7 @@ update msg model =
         IssuesLoaded column issuesJson ->
             let
                 issues json =
-                    Decode.decodeString (Decode.list issueDecoder) json
+                    Decode.decodeString (Decode.list Issue.decoder) json
                         |> Result.toMaybe
             in
                 case column of

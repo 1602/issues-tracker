@@ -5,12 +5,14 @@ import Base64
 -- import Task
 import Http exposing (Error, Response)
 import Messages exposing (..)
-import Decoders exposing (..)
 import Models exposing (..)
 import Json.Encode as Encode
 import Dict
 import Date.Extra as Date exposing (Interval(..))
 import Models exposing (Model)
+import Data.Milestone as Milestone exposing (Milestone)
+import Data.Issue as Issue exposing (Issue)
+import Data.User as User
 
 
 -- import Json.Encode as Encode
@@ -37,7 +39,7 @@ createMilestone repo title accessToken =
         , url =
             "https://api.github.com/repos/" ++ repo ++ "/milestones"
             ++ "?access_token=" ++ (Maybe.withDefault "" accessToken)
-        , expect = Http.expectJson <| milestoneDecoder
+        , expect = Http.expectJson <| Milestone.decoder
         , body = Http.jsonBody <|
             Encode.object
                 [ ( "title", Encode.string title )
@@ -56,7 +58,7 @@ createIssue repo accessToken data onComplete =
         , url =
             "https://api.github.com/repos/" ++ repo ++ "/issues"
             ++ "?access_token=" ++ (Maybe.withDefault "" accessToken)
-        , expect = Http.expectJson <| issueDecoder
+        , expect = Http.expectJson <| Issue.decoder
         , body = Http.jsonBody data
         , timeout = Nothing
         , withCredentials = False
@@ -309,7 +311,7 @@ updateIssueWith repo issueNumber issue accessToken onComplete =
                 ++ issueNumber
                 ++ "?access_token="
                 ++ accessToken
-        , expect = Http.expectJson issueDecoder
+        , expect = Http.expectJson Issue.decoder
         , body = Http.jsonBody issue
         , timeout = Nothing
         , withCredentials = False
@@ -328,7 +330,7 @@ updateIssue repo issue accessToken onComplete =
                 ++ issue.number
                 ++ "?access_token="
                 ++ accessToken
-        , expect = Http.expectJson issueDecoder
+        , expect = Http.expectJson Issue.decoder
         , body = Http.jsonBody <| -- TODO: https://developer.github.com/v3/issues/#edit-an-issue
             Encode.object
                 [ ( "title", Encode.string issue.title )
@@ -400,7 +402,7 @@ fetchUser accessToken =
                         |> List.member "repo"
             in
                 if hasRepoOauthScope then
-                    Decode.decodeString userDecoder res.body
+                    Decode.decodeString User.decoder res.body
                 else
                     Err "Insufficient permissions: 'repo' oauth scope is required"
                 )

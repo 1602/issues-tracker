@@ -6,6 +6,9 @@ import Http exposing (Error, Response)
 import Date
 import Time
 import Navigation exposing (Location)
+import Data.Milestone exposing (Milestone)
+import Data.Issue exposing (Issue)
+import Data.User exposing (User)
 
 type Msg
     = NoOp

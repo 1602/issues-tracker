@@ -1,9 +1,11 @@
 module Models exposing (..)
 
-import Base exposing (..)
 import Date
 import Dict
 import Navigation exposing (Location)
+import Data.Issue exposing (Issue)
+import Data.Milestone exposing (Milestone)
+import Data.User exposing (User)
 
 
 -- import Json.Decode as Decode
@@ -89,44 +91,6 @@ type Filter
     | AssignedTo String
     | HasMentionOf String
 
-type alias User =
-    { login : String
-    , avatar : String
-    }
-
-
-type alias Issue =
-    { number : Id
-    , state : String
-    , title : String
-    , description : String
-    , creator : User
-    , assignees : List User
-    , milestone : Maybe Milestone
-    , htmlUrl : String
-    , labels : List Label
-    , createdAt : Date.Date
-    , updatedAt : Date.Date
-    }
-
-type alias Label =
-    { id : Id
-    , name : String
-    , color : String
-    }
-
-type alias Milestone =
-    { id : Id
-    , number : Id
-    , state : String
-    , title : String
-    , description : Maybe String
-    --, creator : User
-    , openIssues : Int
-    , closedIssues : Int
-    , dueOn : Maybe Date.Date
-    , htmlUrl : String
-    }
 
 type alias ExpandedMilestone =
     { milestone : Milestone
