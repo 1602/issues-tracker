@@ -119,9 +119,8 @@ list model column =
         url =
             "https://api.github.com/repos/"
                 ++ repo
-                ++ "/issues?access_token="
-                ++ accessToken
-                ++ "&sort=updated"
+                ++ "/issues"
+                ++ "?sort=updated"
                 ++ labels
                 ++ state
                 ++ milestone
@@ -130,6 +129,7 @@ list model column =
     in
         cachingFetch
             url
+            accessToken
             model.etags
             (IssuesLoaded column)
 
@@ -148,10 +148,10 @@ listForMilestone model issueState ms =
         state =
             case issueState of
                 OpenIssue ->
-                    "&state=open"
+                    "state=open"
 
                 ClosedIssue ->
-                    "&state=closed"
+                    "state=closed"
 
         filterByUser =
             case filter of
@@ -197,8 +197,7 @@ listForMilestone model issueState ms =
         url =
             "https://api.github.com/repos/"
                 ++ repo
-                ++ "/issues?access_token="
-                ++ accessToken
+                ++ "/issues?"
                 ++ state
                 ++ "&sort=updated"
                 ++ "&milestone=" ++ ms.number
@@ -207,6 +206,7 @@ listForMilestone model issueState ms =
     in
         cachingFetch
             url
+            accessToken
             model.etags
             (MilestoneIssuesLoaded ms.number issueState)
 
@@ -235,11 +235,11 @@ search : Model -> Cmd Msg
 search { repo, accessToken, searchTerms, etags } =
     let
         url =
-            "https://api.github.com/search/issues?access_token="
-                ++ (Maybe.withDefault "" accessToken)
-                ++ "&q=repo:" ++ repo ++ " " ++ searchTerms
+            "https://api.github.com/search/issues?"
+                ++ "q=repo:" ++ repo ++ " " ++ searchTerms
     in
         cachingFetch
             url
+            (accessToken |> Maybe.withDefault "")
             etags
             IssuesSearchResults

@@ -18,8 +18,8 @@ authHeader secretKey =
 
 
 
-cachingFetch : String -> Dict.Dict String (String, String) -> (String -> Msg) -> Cmd Msg
-cachingFetch url etags oncomplete =
+cachingFetch : String -> String -> Dict.Dict String (String, String) -> (String -> Msg) -> Cmd Msg
+cachingFetch url accessToken etags oncomplete =
     let
         (etag, cachedBody) =
             case Dict.get url etags of
@@ -39,30 +39,31 @@ cachingFetch url etags oncomplete =
                         Nothing
                     )
                 |> List.head
-    in
-        Http.request
-            { method = "GET"
-            , headers =
-                if etag /= "" then
-                    [ Http.header "If-None-Match" etag ]
-                else
-                    [ Http.header "If-Modified-Since" "0" ]
-            , url = url
-            , expect = Http.expectStringResponse (\res ->
-                if res.status.code == 304 then
-                    Ok <| CachedData res.url etag cachedBody
-                else
-                    case extractEtag res of
-                        Just etag ->
-                            Ok <| CachedData res.url etag res.body
 
-                        Nothing ->
-                            Ok <| NotCached res.body
-                )
-            , body = Http.emptyBody
-            , timeout = Nothing
-            , withCredentials = False
-            }
+        expect = Http.expectStringResponse (\res ->
+            if res.status.code == 304 then
+                Ok <| CachedData res.url etag cachedBody
+            else
+                case extractEtag res of
+                    Just etag ->
+                        Ok <| CachedData res.url etag res.body
+
+                    Nothing ->
+                        Ok <| NotCached res.body
+            )
+
+        (cacheHeaderName, cacheHeaderValue) =
+                if etag /= "" then
+                    ( "If-None-Match", etag )
+                else
+                    ( "If-Modified-Since", "0" )
+    in
+        url
+            |> HttpBuilder.get
+            |> HttpBuilder.withExpect expect
+            |> withAuthorization accessToken
+            |> withHeader cacheHeaderName cacheHeaderValue
+            |> HttpBuilder.toRequest
             |> Http.send (FetchComplete oncomplete)
 
 

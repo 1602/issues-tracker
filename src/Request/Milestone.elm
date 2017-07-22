@@ -33,10 +33,10 @@ list model =
         url =
             "https://api.github.com/repos/"
                 ++ model.repo
-                ++ "/milestones?access_token="
-                ++ (Maybe.withDefault "" model.accessToken)
+                ++ "/milestones"
     in
         cachingFetch
             url
+            (Maybe.withDefault "" model.accessToken)
             model.etags
             LoadMilestones
