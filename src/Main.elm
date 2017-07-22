@@ -221,9 +221,6 @@ loadResource model =
 port navigateToIssue : (( String, String ) -> msg) -> Sub msg
 
 
-port googleAuth : (String -> msg) -> Sub msg
-
-
 port saveData : Value -> Cmd msg
 
 

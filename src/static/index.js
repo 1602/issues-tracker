@@ -1,57 +1,12 @@
-
-let appData;
-
-try {
-    appData = JSON.parse(localStorage.appData);
-    if (!appData.accessToken && appData.user) {
-        appData.accessToken = appData.user.secretKey;
-        delete appData.user;
+const appData = () => {
+    try {
+        return JSON.parse(localStorage.appData);
+    } catch(e) {
+        return {};
     }
-    if (!appData.pinnedMilestones) {
-        appData.pinnedMilestones = [];
-    }
-    if (!appData.columns) {
-        appData.columns = [ "Icebox", "Backlog", "Current", "Done" ];
-    }
-    if (!appData.defaultRepositoryType) {
-        appData.defaultRepositoryType = 'specified';
-    }
-    if (!appData.defaultRepository) {
-        appData.defaultRepository = 'universalbasket/engineering';
-    }
-    if (!appData.recentRepos) {
-        appData.recentRepos = [ 'universalbasket/engineering' ];
-    }
-    if (!appData.doneLimit) {
-        appData.doneLimit = 'a day'
-    }
-    if (typeof appData.powerOfNow === 'undefined') {
-        appData.powerOfNow = false;
-    }
-    if (typeof appData.savedSearches === 'undefined') {
-        appData.savedSearches = [];
-    }
-} catch(e) {
-    console.log(e);
-    appData =
-        { accessToken: null
-        , pinnedMilestones: []
-        , columns: [ "Icebox", "Backlog", "Current", "Done" ]
-        , defaultRepositoryType : 'specified'
-        , defaultRepository : 'universalbasket/engineering'
-        , recentRepos : [ 'universalbasket/engineering' ]
-        , doneLimit : 'a day'
-        , powerOfNow : false
-        , savedSearches : []
-        };
-}
-
-// inject bundled Elm app into div#main
-const elm = Elm.Main.embed( document.getElementById( 'main' ), [ appData, __VERSION__ ] );
-
-window.onSignIn = function(googleUser) {
-    elm.ports.googleAuth.send(googleUser.getAuthResponse()['id_token']);
 };
+
+const elm = Elm.Main.embed(document.getElementById('main'), appData());
 
 elm.ports.saveData.subscribe(data => {
     localStorage.appData = JSON.stringify(data);

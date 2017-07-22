@@ -211,10 +211,6 @@ const appData = () => {
 
 const elm = Elm.Main.embed(document.getElementById( 'main' ), appData());
 
-window.onSignIn = function(googleUser) {
-    elm.ports.googleAuth.send(googleUser.getAuthResponse()['id_token']);
-};
-
 elm.ports.saveData.subscribe(data => {
     localStorage.appData = JSON.stringify(data);
 });
