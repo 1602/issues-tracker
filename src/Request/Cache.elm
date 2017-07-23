@@ -1,23 +1,23 @@
-module Request.Cache exposing (cachingFetch)
+module Request.Cache exposing (withCache, Etags, RemoteData(..), updateCache, retrieveError, retrieveData)
 
-import Http
-import HttpBuilder exposing (withHeader)
-import Messages exposing (..)
+import Http exposing (Error(..))
+import HttpBuilder exposing (withHeader, RequestBuilder)
 import Dict exposing (Dict)
-import Models exposing (CachedData(..))
-import Request.Helpers exposing (withAuthorization)
+import Json.Decode as Decode exposing (Decoder, decodeString)
 
-cachingFetch : String -> String -> Dict String ( String, String ) -> (String -> Msg) -> Cmd Msg
-cachingFetch url accessToken etags oncomplete =
+
+type alias Etags =
+    Dict String String
+
+
+type RemoteData a
+    = CanBeCached String String a
+    | CanNotBeCached a
+
+
+withCache : Etags -> Decoder a -> RequestBuilder () -> RequestBuilder (RemoteData a)
+withCache etags decoder rb =
     let
-        ( etag, cachedBody ) =
-            case Dict.get url etags of
-                Just ( etag, body ) ->
-                    ( etag, body )
-
-                Nothing ->
-                    ( "", "" )
-
         extractEtag res =
             res.headers
                 |> Dict.toList
@@ -30,31 +30,64 @@ cachingFetch url accessToken etags oncomplete =
                     )
                 |> List.head
 
+        ( cacheHeaderName, cacheHeaderValue ) =
+            case Dict.get rb.url etags of
+                Just etag ->
+                    ( "If-None-Match", etag )
+                Nothing ->
+                    ( "If-Modified-Since", "0" )
+
+        decode str fn =
+            case decodeString decoder str of
+                Ok x -> Ok (fn x)
+                Err y -> Err y
+
         expect =
             Http.expectStringResponse
                 (\res ->
-                    if res.status.code == 304 then
-                        Ok <| CachedData res.url etag cachedBody
-                    else
-                        case extractEtag res of
-                            Just etag ->
-                                Ok <| CachedData res.url etag res.body
+                    case extractEtag res of
+                        Just etag ->
+                            decode res.body (CanBeCached res.url etag)
 
-                            Nothing ->
-                                Ok <| NotCached res.body
+                        Nothing ->
+                            decode res.body CanNotBeCached
                 )
-
-        ( cacheHeaderName, cacheHeaderValue ) =
-            if etag /= "" then
-                ( "If-None-Match", etag )
-            else
-                ( "If-Modified-Since", "0" )
     in
-        url
-            |> HttpBuilder.get
+        rb
             |> HttpBuilder.withExpect expect
-            |> withAuthorization accessToken
             |> withHeader cacheHeaderName cacheHeaderValue
-            |> HttpBuilder.toRequest
-            |> Http.send (FetchComplete oncomplete)
 
+
+updateCache : Result Error (RemoteData a) -> Etags -> Etags
+updateCache result cache = 
+    case result of
+        Ok (CanBeCached url etag _) ->
+            Dict.insert url etag cache
+
+        _ ->
+            cache
+
+
+retrieveError : Result Error a -> Maybe String
+retrieveError result =
+    case result of
+        Err (BadStatus res) ->
+            if res.status.code == 304 then
+                Nothing
+            else
+                Just <| toString e
+
+        Err e ->
+            Just <| toString e
+
+        _ ->
+            Nothing
+
+
+retrieveData : Result x (RemoteData a) -> a -> a
+retrieveData result prevData =
+    case result of
+        Ok (CanBeCached _ _ data) ->
+            data
+        _ ->
+            prevData
