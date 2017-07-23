@@ -1406,77 +1406,7 @@ viewPage user model route =
                     |> append groups.earlier "Updated more than a week ago" False
 
         milestonesIndex =
-            case Dict.get model.repo model.milestones of
-                Just milestones ->
-                    milestones
-                        |> Dict.values
-                        |> List.sortBy
-                            (\s ->
-                                case s.milestone.dueOn of
-                                    Just date ->
-                                        Date.toTime date |> Time.inHours
-
-                                    Nothing ->
-                                        1 / 0
-                            )
-                        |> List.map
-                            (\s ->
-                                let
-                                    isOverdue =
-                                        case s.milestone.dueOn of
-                                            Just date ->
-                                                (Date.toTime date) < (Date.toTime model.now)
-
-                                            Nothing ->
-                                                False
-                                in
-                                    Html.li
-                                        [ style
-                                            [ ( "list-style", "none" )
-                                            , ( "padding", "5px" )
-                                            , ( "margin", "2px" )
-                                            , ( "border-bottom", "1px solid #333" )
-                                            , ( "border-left"
-                                              , case s.milestone.dueOn of
-                                                    Just date ->
-                                                        (toString
-                                                            (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
-                                                        )
-                                                            ++ "px solid #444"
-
-                                                    Nothing ->
-                                                        "0px"
-                                              )
-                                            ]
-                                        ]
-                                        [ Html.a [ Attrs.target "_blank", Attrs.href s.milestone.htmlUrl ] [ text <| s.milestone.title ++ " " ]
-                                        , Html.span
-                                            [ style
-                                                [ ( "color"
-                                                  , if isOverdue then
-                                                        "red"
-                                                    else
-                                                        "grey"
-                                                  )
-                                                ]
-                                            ]
-                                            [ text <|
-                                                case s.milestone.dueOn of
-                                                    Just date ->
-                                                        if isOverdue then
-                                                            " (" ++ (Distance.inWords date model.now) ++ " overdue)"
-                                                        else
-                                                            " (due in " ++ (Distance.inWords date model.now) ++ ")"
-
-                                                    Nothing ->
-                                                        " (no due date)"
-                                            ]
-                                        ]
-                            )
-                        |> Html.ul [ style [ ( "zoom", "150%" ) ] ]
-
-                Nothing ->
-                    text "Loading..."
+            Page.Roadmap.view model.roadmap
 
         column col colHtml content =
             let
