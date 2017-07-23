@@ -25,7 +25,7 @@ create (user, repo) accessToken data onComplete =
         |> Http.send onComplete
 
 
-list : Model -> Column -> Cmd Msg
+list : Model -> Column -> Http.Request (RemoteData (List Issue))
 list model column =
     let
         filter =
@@ -116,6 +116,8 @@ list model column =
 
                 _ ->
                     ""
+        expect =
+            Http.expectJson (Decode.list Issue.decoder)
 
         url =
             apiUrl <|
@@ -131,11 +133,10 @@ list model column =
                     ++ filterByUser
                     ++ since
     in
-        cachingFetch
-            url
-            accessToken
-            model.etags
-            (IssuesLoaded column)
+        url
+            |> withAuthorization accessToken
+            |> withCache model.etags expect
+            |> HttpBuilder.toRequest
 
 
 listForMilestone : Model -> IssueState -> Milestone -> Cmd Msg
