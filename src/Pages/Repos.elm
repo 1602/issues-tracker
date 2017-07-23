@@ -1,26 +1,35 @@
 module Pages.Repos exposing (Msg, Model, view, init, update)
 
-import Http
+import Http exposing (Error)
 import Html exposing (div, text, ul, li)
 import Html.Attributes exposing (href)
 import Data.Repo as Repo exposing (Repo)
 import Request.Repo
 import Data.PersistentData exposing (PersistentData)
+import Request.Cache exposing (Etags, RemoteData, retrieveError, retrieveData, updateCache)
+import Dict
 
 type Msg
-    = LoadedReposList (Result Http.Error (List Repo))
+    = LoadedReposList (Result Error (RemoteData (List Repo)))
 
 type alias Model =
     { list : List Repo
     , accessToken : String
-    , error : Maybe Http.Error
+    , error : Maybe String
+    , cache : Etags
     }
 
 init : PersistentData -> (Model, Cmd Msg)
 init pd =
-    Model [] pd.accessToken Nothing ! [
-        Request.Repo.list pd.accessToken |> Http.send LoadedReposList
-    ]
+    let
+        model =
+            Model
+                []
+                pd.accessToken
+                Nothing
+                Dict.empty
+    in
+       model ! [ Request.Repo.list model.accessToken model.cache |> Http.send LoadedReposList ]
 
 
 view : Model -> Html.Html Msg
@@ -39,9 +48,9 @@ view model =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        LoadedReposList r ->
-            case r of
-                Ok repos ->
-                    { model | list = repos, error = Nothing }
-                Err e ->
-                    { model | list = [], error = Just e }
+        LoadedReposList result ->
+            { model
+                | list = retrieveData result model.list
+                , error = retrieveError result
+                , cache = updateCache result model.cache
+            }
