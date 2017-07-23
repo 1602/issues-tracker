@@ -48,6 +48,7 @@ type Msg
     | FilterStories String
     | FetchComplete (String -> Msg) (Result Error CachedData)
     | SettingsMsgProxy SettingsMsg
+    | ReposMsgProxy Pages.Repos.Msg
     | NavigateToIssue (String, String)
     | SearchIssues
     | ChangeSearchTerms String

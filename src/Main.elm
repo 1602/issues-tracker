@@ -28,6 +28,7 @@ import Data.PersistentData exposing (PersistentData)
 import Data.Column exposing (Column(..))
 import Json.Decode exposing (Value)
 import Ports exposing (saveData)
+import Pages.Repos as Repos
 
 
 main : Program Value Model Msg
@@ -65,6 +66,9 @@ init initialData location =
                 |> Decode.decodeValue Data.PersistentData.decoder
                 |> Result.toMaybe
                 |> Maybe.withDefault Data.PersistentData.default
+
+        (repos, cmdRepos) =
+            Repos.init persistentData
 
         model =
             Model
@@ -129,6 +133,8 @@ init initialData location =
                 True
                 -- persistentData
                 persistentData
+                -- repos
+                repos
 
         defaultRepo =
             if persistentData.defaultRepositoryType == "specified" then
@@ -347,6 +353,9 @@ update msg model =
                     { model | persistentData = updateSettings msg model.persistentData }
             in
                 updatedModel ! [ updateLocalStorage updatedModel ]
+
+        ReposMsgProxy msg ->
+            { model | repos = Repos.update msg model.repos } ! []
 
         FetchComplete msg result ->
             case result of

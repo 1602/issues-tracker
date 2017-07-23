@@ -8,6 +8,7 @@ import Data.Milestone exposing (Milestone)
 import Data.User exposing (User)
 import Data.Column exposing (Column(..))
 import Data.PersistentData exposing (PersistentData)
+import Pages.Repos
 
 
 type IssueState = OpenIssue | ClosedIssue
@@ -40,6 +41,7 @@ type alias Model =
     , searchResults : RemoteData (List Issue)
     , didSwitch : Bool
     , persistentData : PersistentData
+    , repos : Pages.Repos.Model
     }
 
 

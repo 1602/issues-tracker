@@ -1,14 +1,18 @@
-module Route exposing (Route, Route(..), parseHash)
+module Route exposing (Route, Route(..), parseHash, href)
 
 -- import Base exposing (..)
 import UrlParser exposing (Parser, (</>), s, int, string, map, oneOf)
 import Navigation exposing (Location)
+import Html.Attributes as Attr
+import Html exposing (Attribute)
+
 
 type Route
-    = IssuesIndex String String
+    = Stories String String
     | Story String String String
-    | MilestonesIndex String String
+    | Milestones String String
     | Settings String String
+    | Repos
 
 
 route : Parser (Route -> a) a
