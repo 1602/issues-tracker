@@ -1,21 +1,42 @@
 module Pages.Roadmap exposing (Model, Msg, init, view, update)
 
+import Dict
 import Html exposing (Html, div, text)
-import Dict exposing (Dict)
+import Html.Attributes as Attrs exposing (href, style)
 import Data.Milestone as Milestone exposing (Milestone)
 import Request.Milestone
+import Http
+import Request.Cache exposing (Etags, CachedResult, retrieveData, updateCache, retrieveError)
+import Date exposing (Date)
+import Time exposing (Time)
+import Date.Distance as Distance
 
 type Msg =
-    None
+    LoadMilestones (CachedResult (List Milestone))
 
 type alias Model =
     { list : List Milestone
+    , accessToken : String
+    , repo : (String, String)
+    , cache : Etags
+    , now : Date
     }
 
 
 init : String -> (String, String) -> (Model, Cmd Msg)
-init { accessToken } =
-    Model [] ! [ Request.Milestone.list accessToken ]
+init accessToken repo =
+    let
+        model =
+            Model
+                []
+                accessToken
+                repo
+                -- cache
+                Dict.empty
+                -- now
+                (Date.fromTime <| Time.millisecond * (toFloat 0))
+    in
+       model ! [ Request.Milestone.list model.repo model.accessToken model.cache |> Http.send LoadMilestones ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg)
@@ -25,74 +46,73 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    case Dict.get model.repo model.milestones of
-        Just milestones ->
-            milestones
-                |> Dict.values
-                |> List.sortBy
-                    (\s ->
-                        case s.milestone.dueOn of
-                            Just date ->
-                                Date.toTime date |> Time.inHours
+    let
+        milestones =
+            model.list
+    in
+        milestones
+            |> List.sortBy
+                (\milestone ->
+                    case milestone.dueOn of
+                        Just date ->
+                            Date.toTime date |> Time.inHours
 
-                            Nothing ->
-                                1 / 0
-                    )
-                |> List.map
-                    (\s ->
-                        let
-                            isOverdue =
-                                case s.milestone.dueOn of
-                                    Just date ->
-                                        (Date.toTime date) < (Date.toTime model.now)
+                        Nothing ->
+                            1 / 0
+                )
+            |> List.map
+                (\milestone ->
+                    let
+                        isOverdue =
+                            case milestone.dueOn of
+                                Just date ->
+                                    (Date.toTime date) < (Date.toTime model.now)
 
-                                    Nothing ->
-                                        False
-                        in
-                            Html.li
+                                Nothing ->
+                                    False
+                    in
+                        Html.li
+                            [ style
+                                [ ( "list-style", "none" )
+                                , ( "padding", "5px" )
+                                , ( "margin", "2px" )
+                                , ( "border-bottom", "1px solid #333" )
+                                , ( "border-left"
+                                  , case milestone.dueOn of
+                                        Just date ->
+                                            (toString
+                                                (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
+                                            )
+                                                ++ "px solid #444"
+
+                                        Nothing ->
+                                            "0px"
+                                  )
+                                ]
+                            ]
+                            [ Html.a [ Attrs.target "_blank", href milestone.htmlUrl ] [ text <| milestone.title ++ " " ]
+                            , Html.span
                                 [ style
-                                    [ ( "list-style", "none" )
-                                    , ( "padding", "5px" )
-                                    , ( "margin", "2px" )
-                                    , ( "border-bottom", "1px solid #333" )
-                                    , ( "border-left"
-                                      , case s.milestone.dueOn of
-                                            Just date ->
-                                                (toString
-                                                    (((Date.toTime date |> Time.inHours) / 12) - ((Date.toTime model.now |> Time.inHours) / 12))
-                                                )
-                                                    ++ "px solid #444"
-
-                                            Nothing ->
-                                                "0px"
+                                    [ ( "color"
+                                      , if isOverdue then
+                                            "red"
+                                        else
+                                            "grey"
                                       )
                                     ]
                                 ]
-                                [ Html.a [ Attrs.target "_blank", Attrs.href s.milestone.htmlUrl ] [ text <| s.milestone.title ++ " " ]
-                                , Html.span
-                                    [ style
-                                        [ ( "color"
-                                          , if isOverdue then
-                                                "red"
+                                [ text <|
+                                    case milestone.dueOn of
+                                        Just date ->
+                                            if isOverdue then
+                                                " (" ++ (Distance.inWords date model.now) ++ " overdue)"
                                             else
-                                                "grey"
-                                          )
-                                        ]
-                                    ]
-                                    [ text <|
-                                        case s.milestone.dueOn of
-                                            Just date ->
-                                                if isOverdue then
-                                                    " (" ++ (Distance.inWords date model.now) ++ " overdue)"
-                                                else
-                                                    " (due in " ++ (Distance.inWords date model.now) ++ ")"
+                                                " (due in " ++ (Distance.inWords date model.now) ++ ")"
 
-                                            Nothing ->
-                                                " (no due date)"
-                                    ]
+                                        Nothing ->
+                                            " (no due date)"
                                 ]
-                    )
-                |> Html.ul [ style [ ( "zoom", "150%" ) ] ]
+                            ]
+                )
+            |> Html.ul [ style [ ( "zoom", "150%" ) ] ]
 
-        Nothing ->
-            text "Loading..."

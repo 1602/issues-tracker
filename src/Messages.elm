@@ -11,15 +11,17 @@ import Data.Issue exposing (Issue)
 import Data.User exposing (User)
 import Data.Column exposing (Column(..))
 import Pages.Repos
+import Pages.Roadmap
+import Request.Cache exposing (CachedResult)
 
 type Msg
     = NoOp
-    | LoadMilestones String
-    | MilestoneIssuesLoaded String IssueState String
+    | LoadMilestones (CachedResult (List Milestone))
+    | MilestoneIssuesLoaded String IssueState (CachedResult (List Issue))
     | CurrentDate Date.Date
     | CurrentTime Time.Time
     | UrlChange Location
-    | IssuesLoaded Column String
+    | IssuesLoaded Column (CachedResult (List Issue))
     | UnsetMilestone Milestone (Result Error Issue)
     | SetMilestone Issue Milestone
     | MilestoneSet Milestone (Result Error Issue)
@@ -47,11 +49,12 @@ type Msg
     | PinMilestone String
     | FilterStories String
     | SettingsMsgProxy SettingsMsg
+    | RoadmapMsgProxy Pages.Roadmap.Msg
     | ReposMsgProxy Pages.Repos.Msg
     | NavigateToIssue (String, String)
     | SearchIssues
     | ChangeSearchTerms String
-    | IssuesSearchResults String
+    | IssuesSearchResults (CachedResult (List Issue))
     | ToggleSaveSearch
     | SearchBy String
     | ClearSearch

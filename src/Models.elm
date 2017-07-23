@@ -9,6 +9,7 @@ import Data.User exposing (User)
 import Data.Column exposing (Column(..))
 import Data.PersistentData exposing (PersistentData)
 import Pages.Repos
+import Pages.Roadmap
 
 
 type IssueState = OpenIssue | ClosedIssue
@@ -36,12 +37,14 @@ type alias Model =
     , addIssueToMilestone : String
     , filter : Filter
     , filterStoriesBy : String
-    , etags : Dict.Dict String (String, String)
+    , etags : Dict.Dict String String
     , searchTerms : String
-    , searchResults : RemoteData (List Issue)
+    , searchResults : List Issue
     , didSwitch : Bool
     , persistentData : PersistentData
     , repos : Pages.Repos.Model
+    , roadmap : Pages.Roadmap.Model
+    , listMilestones : List Milestone
     }
 
 
