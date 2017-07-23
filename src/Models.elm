@@ -51,11 +51,6 @@ type RemoteData a
     | Loaded a
 
 
-type CachedData
-    = CachedData String String String
-    | NotCached String
-
-
 type Filter
     = All
     | CreatedBy String
