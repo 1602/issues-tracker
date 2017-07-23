@@ -210,6 +210,7 @@ const appData = () => {
 };
 
 const elm = Elm.Main.embed(document.getElementById( 'main' ), appData());
+// const elm = Elm.SSCCE.embed(document.getElementById( 'main' ));
 
 elm.ports.saveData.subscribe(data => {
     localStorage.appData = JSON.stringify(data);
