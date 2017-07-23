@@ -20,7 +20,6 @@ import Json.Decode as Decode
 import GithubMarkdown exposing (ghMd)
 import Data.Issue as Issue exposing (Issue)
 import Data.User as User exposing (User)
-import Data.Milestone as Milestone
 import Request.Issue
 import Request.User
 import Request.Milestone
@@ -29,6 +28,8 @@ import Data.Column exposing (Column(..))
 import Json.Decode exposing (Value)
 import Ports exposing (saveData)
 import Pages.Repos as Repos
+import Pages.Roadmap
+import Request.Cache exposing (retrieveError, retrieveData, updateCache)
 
 
 main : Program Value Model Msg
@@ -61,6 +62,17 @@ init initialData location =
                 _ ->
                     ""
 
+        repo =
+            case page of
+                Just (Stories user repo) ->
+                    (user, repo)
+                Just (Story user repo _) ->
+                    (user, repo)
+                Just (Settings user repo) ->
+                    (user, repo)
+                _ ->
+                    ("", "")
+
         persistentData =
             initialData
                 |> Decode.decodeValue Data.PersistentData.decoder
@@ -69,6 +81,9 @@ init initialData location =
 
         (repos, cmdRepos) =
             Repos.init persistentData
+
+        (roadmap, cmdRoadmap) =
+            Pages.Roadmap.init persistentData.accessToken repo
 
         model =
             Model
@@ -79,16 +94,7 @@ init initialData location =
                 -- token
                 ""
                 -- repo
-                (case page of
-                    Just (Stories user repo) ->
-                        (user, repo)
-                    Just (Story user repo _) ->
-                        (user, repo)
-                    Just (Settings user repo) ->
-                        (user, repo)
-                    _ ->
-                        ("", "")
-                )
+                repo
                 -- location
                 location
                 -- now
@@ -128,13 +134,17 @@ init initialData location =
                 -- searchTerms
                 ""
                 -- searchResults
-                NotRequested
+                []
                 -- disSwitch
                 True
                 -- persistentData
                 persistentData
                 -- repos
                 repos
+                -- roadmap
+                roadmap
+                -- listMilestones
+                []
 
         defaultRepo =
             if persistentData.defaultRepositoryType == "specified" then
@@ -184,10 +194,10 @@ hasNoLabel label issue =
 loadAllIssues : Model -> List (Cmd Msg)
 loadAllIssues model =
     if model.didSwitch then
-        [ Request.Issue.list model Current
-        , Request.Issue.list model Icebox
-        , Request.Issue.list model Done
-        , Request.Milestone.list model
+        [ Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
+        , Request.Issue.list model Icebox |> Http.send (IssuesLoaded Icebox)
+        , Request.Issue.list model Done |> Http.send (IssuesLoaded Done)
+        , Request.Milestone.list model.repo model.persistentData.accessToken model.etags |> Http.send LoadMilestones
         ]
     else
         []
@@ -291,7 +301,7 @@ update msg model =
             model ! []
 
         ClearSearch ->
-            { model | searchTerms = "", searchResults = NotRequested } ! []
+            { model | searchTerms = "", searchResults = [] } ! []
 
         ToggleSaveSearch ->
             let
@@ -314,20 +324,12 @@ update msg model =
             in
                 updatedModel ! [ updateLocalStorage updatedModel ]
 
-        IssuesSearchResults issuesJson ->
-            let
-                issues =
-                    Decode.decodeString (Decode.at [ "items" ] <| Decode.list Issue.decoder) issuesJson
-
-                updatedModel =
-                    case issues of
-                        Ok issues ->
-                            { model | searchResults = Loaded issues }
-
-                        Err e ->
-                            { model | error = Just (toString e) }
-            in
-                updatedModel ! []
+        IssuesSearchResults result ->
+            { model
+                | searchResults = retrieveData result model.searchResults
+                , error = retrieveError result
+                , etags = updateCache result model.etags
+                } ! []
 
         ChangeSearchTerms terms ->
             { model | searchTerms = terms } ! []
@@ -337,11 +339,11 @@ update msg model =
                 updatedModel =
                     { model | searchTerms = s }
             in
-                updatedModel ! [ Request.Issue.search updatedModel ]
+                updatedModel ! [ Request.Issue.search updatedModel |> Http.send IssuesSearchResults ]
 
         SearchIssues ->
             model
-                ! [ Request.Issue.search model ]
+                ! [ Request.Issue.search model |> Http.send IssuesSearchResults ]
 
         NavigateToIssue ( repo, issueNumber ) ->
             model
@@ -357,38 +359,13 @@ update msg model =
         ReposMsgProxy msg ->
             { model | repos = Repos.update msg model.repos } ! []
 
-        FetchComplete msg result ->
-            case result of
-                Ok cachedData ->
-                    case cachedData of
-                        CachedData url etag res ->
-                            update (msg res)
-                                { model
-                                    | etags = Dict.insert url ( etag, res ) model.etags
-                                }
+        RoadmapMsgProxy msg ->
+            let
+                (roadmap, cmd) =
+                    Pages.Roadmap.update msg model.roadmap
+            in
+                { model | roadmap = roadmap } ! [ Cmd.map RoadmapMsgProxy cmd ]
 
-                        NotCached res ->
-                            update (msg res) model
-
-                Err e ->
-                    case e of
-                        BadStatus res ->
-                            let
-                                ( etag, body ) =
-                                    case Dict.get res.url model.etags of
-                                        Just ( etag, body ) ->
-                                            ( etag, body )
-
-                                        Nothing ->
-                                            ( "", "" )
-                            in
-                                if res.status.code == 304 && body /= "" then
-                                    update (msg body) model
-                                else
-                                    { model | error = toString e |> Just } ! []
-
-                        _ ->
-                            { model | error = toString e |> Just } ! []
 
         FilterStories s ->
             { model | filterStoriesBy = s } ! []
@@ -579,17 +556,17 @@ update msg model =
                                 Backlog ->
                                     case milestone of
                                         Just ms ->
-                                            Request.Issue.listForMilestone model OpenIssue ms
+                                            Request.Issue.listForMilestone model OpenIssue ms |> Http.send (MilestoneIssuesLoaded ms.number OpenIssue)
 
                                         Nothing ->
-                                            Request.Issue.list model Icebox
+                                            Request.Issue.list model Icebox |> Http.send (IssuesLoaded Icebox)
 
                                 _ ->
-                                    Request.Issue.list model col
+                                    Request.Issue.list model col |> Http.send (IssuesLoaded col)
                           ]
 
         UrgentIssueAdded result ->
-            model ! [ Request.Issue.list model Icebox ]
+            model ! [ Request.Issue.list model Icebox |> Http.send (IssuesLoaded Icebox) ]
 
         StoryFocused ->
             { model | needFocus = False } ! []
@@ -599,7 +576,7 @@ update msg model =
 
         CreateNewMilestone ->
             { model | newMilestoneTitle = "" }
-                ! [ Request.Milestone.create model.repo model.newMilestoneTitle model.persistentData.accessToken
+                ! [ Request.Milestone.create model.repo model.newMilestoneTitle model.persistentData.accessToken |> Http.send MilestoneCreated
                   ]
 
         EditAccessToken s ->
@@ -712,15 +689,15 @@ update msg model =
                            )
                       )
 
-        MilestoneIssuesLoaded num issueState issuesJson ->
+        MilestoneIssuesLoaded num issueState result ->
             let
                 issues json =
                     Decode.decodeString (Decode.list Issue.decoder) json
                         |> Result.toMaybe
                         |> Maybe.withDefault []
 
-                updateMilestoneIssues issues s =
-                    case s of
+                updateMilestoneIssues maybeMilestone =
+                    case maybeMilestone of
                         Just ms ->
                             case issueState of
                                 OpenIssue ->
