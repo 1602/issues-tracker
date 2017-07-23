@@ -40,28 +40,6 @@ main =
         }
 
 
-extractRepo : String -> String
-extractRepo hash =
-    hash
-        |> String.split "/"
-        |> List.drop 1
-        |> List.take 2
-        |> String.join "/"
-        |> (\s ->
-                if s == "" || s == "/" then
-                    "universalbasket/engineering"
-                else if hash == "#/stories" then
-                    "universalbasket/engineering/stories"
-                else if hash == "#/milestones" then
-                    "universalbasket/engineering/milestones"
-                else if String.startsWith "#/stories/" hash then
-                    "universalbasket/engineering" ++ (String.dropLeft 1 hash)
-                else
-                    s
-           )
-
-
-
 -- MODEL
 
 
@@ -97,7 +75,16 @@ init initialData location =
                 -- token
                 ""
                 -- repo
-                (extractRepo location.hash)
+                (case page of
+                    Just (Stories user repo) ->
+                        (user, repo)
+                    Just (Story user repo _) ->
+                        (user, repo)
+                    Just (Settings user repo) ->
+                        (user, repo)
+                    _ ->
+                        ("", "")
+                )
                 -- location
                 location
                 -- now
@@ -161,12 +148,18 @@ init initialData location =
                     Request.User.get persistentData.accessToken
                , case page of
                     Nothing ->
-                        Navigation.modifyUrl <| "#/" ++ (Maybe.withDefault model.repo defaultRepo) ++ "/stories"
+                        case defaultRepo of
+                            Just repo ->
+                                Navigation.modifyUrl <| "#/" ++ repo ++ "/stories"
+
+                            Nothing ->
+                                Cmd.none
 
                     Just _ ->
                         Cmd.none
                ]
                 ++ (loadResource model)
+                ++ [Cmd.map ReposMsgProxy cmdRepos]
               )
 
 
@@ -205,11 +198,14 @@ loadResource model =
                 Just (Story user repo id) ->
                     loadAllIssues model
 
-                Just (IssuesIndex user repo) ->
+                Just (Stories user repo) ->
                     loadAllIssues model
 
-                Just (MilestonesIndex user repo) ->
+                Just (Milestones user repo) ->
                     loadAllIssues model
+
+                Just (Route.Repos) ->
+                    []
 
                 Nothing ->
                     loadAllIssues model
@@ -390,9 +386,15 @@ update msg model =
 
         PinMilestone s ->
             let
+                (u, r) =
+                    model.repo
+
+                thisRepo =
+                    u ++ "/" ++ r
+
                 pinnedMilestone =
                     model.persistentData.pinnedMilestones
-                        |> Dict.get model.repo
+                        |> Dict.get thisRepo
                         |> Maybe.withDefault ""
 
                 n =
@@ -408,7 +410,7 @@ update msg model =
                     { pd
                         | pinnedMilestones =
                             pd.pinnedMilestones
-                                |> Dict.insert model.repo n
+                                |> Dict.insert thisRepo n
                     }
 
                 updatedModel =
@@ -637,44 +639,38 @@ update msg model =
         CurrentTime now ->
             { model | now = Date.fromTime now } ! loadAllIssues model
 
-        SelectStory issue ->
-            case parseHash model.location of
-                Just (Story user repo n) ->
-                    model
-                        ! [ if issue.number == n then
-                                Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories"
-                            else
-                                Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
-                          ]
-
-                Just (IssuesIndex user repo) ->
-                    model ! [ Navigation.modifyUrl <| "#/" ++ model.repo ++ "/stories/" ++ issue.number ]
-
-                _ ->
-                    model ! []
-
         UrlChange location ->
             let
+                (highlightStory, u, r) =
+                    case parseHash location of
+                        Just (Story u r s) ->
+                            (s, u, r)
+
+                        Just (Stories u r) ->
+                            ("", u, r)
+
+                        Just (Settings u r) ->
+                            ("", u, r)
+
+                        _ ->
+                            ("", "", "")
+
                 newRepository =
-                    extractRepo location.hash
+                    (u, r)
+
+                newRepo =
+                    u ++ "/" ++ r
 
                 didSwitch =
                     newRepository /= model.repo
 
                 prependNewRepositoryToRecent =
-                    newRepository
+                    newRepo
                         :: (model.persistentData.recentRepos
-                                |> List.filter ((/=) newRepository)
+                                |> List.filter ((/=) newRepo)
                                 |> List.take 19
                            )
 
-                highlightStory =
-                    case parseHash location of
-                        Just (Story _ _ s) ->
-                            s
-
-                        _ ->
-                            ""
 
                 needFocus =
                     (highlightStory /= "") && (highlightStory /= model.highlightStory)
@@ -823,15 +819,18 @@ update msg model =
 
                     Ok milestones ->
                         let
+                            (u, r) =
+                                model.repo
+
+                            thisRepo =
+                                u ++ "/" ++ r
+
                             recentRepos =
-                                if (Maybe.withDefault "" <| List.head model.persistentData.recentRepos) == model.repo then
-                                    model.persistentData.recentRepos
-                                else
-                                    model.repo
-                                        :: (model.persistentData.recentRepos
-                                                |> List.filter ((/=) model.repo)
-                                                |> List.take 19
-                                           )
+                                thisRepo
+                                    :: (model.persistentData.recentRepos
+                                            |> List.filter ((/=) thisRepo)
+                                            |> List.take 19
+                                       )
 
                             updatedMilestones =
                                 milestones
@@ -1535,7 +1534,7 @@ viewPage user model route =
                 else
                     text ""
 
-        issuesIndex =
+        storiesIndex =
             Html.main_
                 [ style
                     [ ( "display", "flex" )
@@ -1684,17 +1683,20 @@ viewPage user model route =
     in
         case route of
             Nothing ->
-                issuesIndex
+                Html.map ReposMsgProxy <| Repos.view model.repos
 
             Just r ->
                 case r of
+                    Repos ->
+                        Html.map ReposMsgProxy <| Repos.view model.repos
+
                     Story user repo id ->
-                        issuesIndex
+                        storiesIndex
 
-                    IssuesIndex user repo ->
-                        issuesIndex
+                    Stories user repo ->
+                        storiesIndex
 
-                    MilestonesIndex user repo ->
+                    Milestones user repo ->
                         milestonesIndex
 
                     Settings user repo ->
@@ -1777,9 +1779,12 @@ viewSettings model =
 listIssuesWithinMilestones : Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Model -> Html Msg
 listIssuesWithinMilestones milestones issueState now model =
     let
+        (u, r) =
+            model.repo
+
         pinnedMilestoneNumber =
             model.persistentData.pinnedMilestones
-                |> Dict.get model.repo
+                |> Dict.get (u ++ "/" ++ r)
                 |> Maybe.withDefault ""
 
         milestoneSortingRule ems =
@@ -1969,6 +1974,9 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
 
                 Nothing ->
                     Nothing
+
+        (user, repo) =
+            model.repo
     in
         issues
             |> List.filter
@@ -1993,11 +2001,10 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                             , Html.a [ Attrs.href issue.htmlUrl, Attrs.target "_blank" ] [ text <| "#" ++ issue.number ]
                             , Html.a
                                 [ style [ ( "color", getPriorityColor issue ), ( "cursor", "pointer" ) ]
-                                  --, onClick <| SelectStory issue
                                 , if model.highlightStory == issue.number then
-                                    Attrs.href <| "#/" ++ model.repo ++ "/stories"
+                                    Route.href <| Stories user repo
                                   else
-                                    Attrs.href <| "#/" ++ model.repo ++ "/stories/" ++ issue.number
+                                    Route.href <| Story user repo issue.number
                                 ]
                                 [ text <| " " ++ issue.title ++ " " ]
                             , Html.i [ style [ ( "color", "darkgrey" ) ] ]
@@ -2221,6 +2228,9 @@ textareaStyle =
 viewNavigation : Maybe User -> Model -> Html Msg
 viewNavigation user model =
     let
+        (u, r) =
+            model.repo
+
         showColumns =
             model.persistentData.columns
 
@@ -2249,7 +2259,7 @@ viewNavigation user model =
                 Just (Story _ _ _) ->
                     issuesSubnav
 
-                Just (IssuesIndex _ _) ->
+                Just (Stories _ _) ->
                     issuesSubnav
 
                 _ ->
@@ -2323,7 +2333,7 @@ viewNavigation user model =
                     Just user ->
                         Html.li [ menuListItemStyle isSettingsActive ]
                             [ Html.a
-                                [ Attrs.href <| "#/" ++ model.repo ++ "/settings"
+                                [ Route.href <| Settings u r
                                 , style
                                     [ ( "display", "inline-block" )
                                     , ( "vertical-align", "middle" )

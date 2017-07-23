@@ -7,15 +7,16 @@ import Json.Decode exposing (Value)
 import Models exposing (Model, Filter(..), IssueState(..))
 import Date.Extra as Date exposing (Interval(..))
 import Messages exposing (Msg(..))
-import Request.Helpers exposing (cachingFetch, withAuthorization, apiUrl)
+import Request.Helpers exposing (withAuthorization, apiUrl)
+import Request.Cache exposing (cachingFetch)
 import Json.Encode as Encode
 import HttpBuilder
 import Data.Column exposing (Column(..))
 
 
-create : String -> String -> Value -> (Result Error Issue -> a) -> Cmd a
-create repo accessToken data onComplete =
-    apiUrl ("/repos/" ++ repo ++ "/issues")
+create : (String, String) -> String -> Value -> (Result Error Issue -> a) -> Cmd a
+create (user, repo) accessToken data onComplete =
+    apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues")
         |> HttpBuilder.post
         |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
         |> HttpBuilder.withBody (Http.jsonBody data)
@@ -30,7 +31,7 @@ list model column =
         filter =
             model.filter
 
-        repo =
+        (user, repo) =
             model.repo
 
         accessToken =
@@ -119,6 +120,8 @@ list model column =
         url =
             apiUrl <|
                 "/repos/"
+                    ++ user
+                    ++ "/"
                     ++ repo
                     ++ "/issues"
                     ++ "?sort=updated"
@@ -141,7 +144,7 @@ listForMilestone model issueState ms =
         filter =
             model.filter
 
-        repo =
+        (user, repo) =
             model.repo
 
         accessToken =
@@ -201,6 +204,8 @@ listForMilestone model issueState ms =
         url =
             apiUrl <|
                 "/repos/"
+                    ++ user
+                    ++ "/"
                     ++ repo
                     ++ "/issues?"
                     ++ state
@@ -217,9 +222,9 @@ listForMilestone model issueState ms =
             (MilestoneIssuesLoaded ms.number issueState)
 
 
-update : String -> String -> Encode.Value -> String -> (Result Error Issue -> a) -> Cmd a
-update repo issueNumber issue accessToken onComplete =
-    apiUrl ("/repos/" ++ repo ++ "/issues/" ++ issueNumber)
+update : (String, String) -> String -> Encode.Value -> String -> (Result Error Issue -> a) -> Cmd a
+update (user, repo) issueNumber issue accessToken onComplete =
+    apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues/" ++ issueNumber)
         |> HttpBuilder.patch
         |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
         |> withAuthorization accessToken
@@ -230,8 +235,11 @@ update repo issueNumber issue accessToken onComplete =
 
 search : Model -> Cmd Msg
 search { repo, persistentData, searchTerms, etags } =
+    let
+        (u, r) = repo
+    in
     cachingFetch
-        (apiUrl <| "/search/issues?" ++ "q=repo:" ++ repo ++ " " ++ searchTerms)
+        (apiUrl <| "/search/issues?" ++ "q=repo:" ++ u ++ "/" ++ r ++ " " ++ searchTerms)
         persistentData.accessToken
         etags
         IssuesSearchResults

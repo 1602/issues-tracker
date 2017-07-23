@@ -17,14 +17,14 @@ type alias Model =
     { version : String
     , user : Maybe User
     , token : String
-    , repo : String
+    , repo : (String, String)
     , location : Location
     , now : Date.Date
     , error : Maybe String
     , currentIssues : Maybe (List Issue)
     , iceboxIssues : Maybe (List Issue)
     , closedIssues : Maybe (List Issue)
-    , milestones : Dict.Dict String (Dict.Dict String ExpandedMilestone)
+    , milestones : Dict.Dict (String, String) (Dict.Dict String ExpandedMilestone)
     , pickMilestoneForIssue : Maybe Issue
     , lockedIssueNumber : String
     , highlightStory : String
@@ -53,13 +53,6 @@ type CachedData
     = CachedData String String String
     | NotCached String
 
-
-type alias Settings =
-    { defaultRepositoryType : String
-    , defaultRepository : String
-    , doneLimit : String
-    , powerOfNow : Bool
-    }
 
 type Filter
     = All

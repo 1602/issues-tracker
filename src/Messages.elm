@@ -10,6 +10,7 @@ import Data.Milestone exposing (Milestone)
 import Data.Issue exposing (Issue)
 import Data.User exposing (User)
 import Data.Column exposing (Column(..))
+import Pages.Repos
 
 type Msg
     = NoOp
@@ -32,7 +33,6 @@ type Msg
     | EditAccessToken String
     | SaveAccessToken
     | DismissPlanningIssue
-    | SelectStory Issue
     | EditNewMilestoneTitle String
     | CreateNewMilestone
     | StoryFocused
@@ -61,3 +61,4 @@ type SettingsMsg
     | UpdateDefaultRepository String
     | ChangeDoneLimit String
     | IgnoreIdeas
+

@@ -7,10 +7,6 @@ import Base64
 -- import Task
 
 import Http exposing (Error, Response)
-import Messages exposing (..)
-import Models exposing (..)
-import Dict
-import Models exposing (Model)
 
 
 apiUrl : String -> String

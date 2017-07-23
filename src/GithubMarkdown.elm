@@ -4,12 +4,12 @@ import Html
 import Markdown exposing (toHtml)
 import Regex exposing (regex, replace, HowMany(..))
 
-ghMd : String -> String -> Html.Html msg
-ghMd repo str =
+ghMd : (String, String) -> String -> Html.Html msg
+ghMd (u, r) str =
     str
         |> replaceLinksWithIssues
         |> replaceNamedLinksWithIssues
-        |> replaceHashesWithLinks repo
+        |> replaceHashesWithLinks (u ++ "/" ++ r)
         |> toHtml []
 
 replaceHashesWithLinks : String -> String -> String

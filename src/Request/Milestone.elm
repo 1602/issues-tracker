@@ -5,13 +5,14 @@ import Messages exposing (Msg(..))
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Encode as Encode
 import Models exposing (Model)
-import Request.Helpers exposing (cachingFetch, apiUrl, withAuthorization)
+import Request.Helpers exposing (apiUrl, withAuthorization)
+import Request.Cache exposing (cachingFetch)
 import HttpBuilder exposing (withExpect, withBody)
 import Util exposing ((=>))
 
 
-create : String -> String -> String -> Cmd Msg
-create repo title accessToken =
+create : (String, String) -> String -> String -> Cmd Msg
+create (user, repo) title accessToken =
     let
         body =
             [ "title" => Encode.string title
@@ -19,7 +20,7 @@ create repo title accessToken =
                 |> Encode.object
                 |> Http.jsonBody
     in
-        apiUrl ("/repos/" ++ repo ++ "/milestones")
+        apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/milestones")
             |> HttpBuilder.post
             |> withAuthorization accessToken
             |> withExpect (Http.expectJson Milestone.decoder)
@@ -29,9 +30,16 @@ create repo title accessToken =
 
 
 list : Model -> Cmd Msg
-list model =
-    cachingFetch
-        (apiUrl <| "/repos/" ++ model.repo ++ "/milestones")
-        model.persistentData.accessToken
-        model.etags
-        LoadMilestones
+list { repo, persistentData, etags } =
+    let
+        (u, r) =
+            repo
+
+        url =
+            apiUrl <| "/repos/" ++ u ++ "/" ++ r ++ "/milestones"
+    in
+        cachingFetch
+            url
+            persistentData.accessToken
+            etags
+            LoadMilestones
