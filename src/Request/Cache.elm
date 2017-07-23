@@ -1,4 +1,4 @@
-module Request.Cache exposing (withCache, Etags, RemoteData(..), updateCache, retrieveError, retrieveData)
+module Request.Cache exposing (withCache, Etags, RemoteData(..), updateCache, retrieveError, retrieveData, CachedRequest, CachedResult)
 
 import Http exposing (Error(..))
 import HttpBuilder exposing (withHeader, RequestBuilder)
@@ -14,6 +14,12 @@ type RemoteData a
     = CanBeCached String String a
     | CanNotBeCached a
 
+
+type alias CachedRequest a =
+    Http.Request (RemoteData a)
+
+type alias CachedResult a =
+    Result Error (RemoteData a)
 
 withCache : Etags -> Decoder a -> RequestBuilder () -> RequestBuilder (RemoteData a)
 withCache etags decoder rb =
