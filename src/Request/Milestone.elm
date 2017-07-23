@@ -6,7 +6,7 @@ import Data.Milestone as Milestone exposing (Milestone)
 import Json.Encode as Encode
 import Models exposing (Model)
 import Request.Helpers exposing (apiUrl, withAuthorization)
-import Request.Cache exposing (cachingFetch)
+import Request.Cache exposing (withCache, RemoteData)
 import HttpBuilder exposing (withExpect, withBody)
 import Util exposing ((=>))
 
@@ -35,11 +35,8 @@ list { repo, persistentData, etags } =
         (u, r) =
             repo
 
-        url =
-            apiUrl <| "/repos/" ++ u ++ "/" ++ r ++ "/milestones"
     in
-        cachingFetch
-            url
-            persistentData.accessToken
-            etags
-            LoadMilestones
+        apiUrl ("/repos/" ++ u ++ "/" ++ r ++ "/milestones")
+            |> HttpBuilder.get
+            |> withAuthorization persistentData.accessToken
+            |> withCache etags

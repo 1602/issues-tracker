@@ -1,19 +1,20 @@
 module Request.Repo exposing (list)
 
-import Request.Helpers exposing (withAuthorization, apiUrl)
-import Http
 import HttpBuilder
+import Request.Helpers exposing (withAuthorization, apiUrl)
+import Request.Cache exposing (withCache, RemoteData, Etags)
+import Http
 import Data.Repo as Repo exposing (Repo)
 import Json.Decode as Decode
 
-list : String -> Http.Request (List Repo)
-list accessToken =
+list : String -> Etags -> Http.Request (RemoteData (List Repo))
+list accessToken etags =
     let
-        expect =
-            Http.expectJson (Decode.list Repo.decoder)
+        decoder =
+            Decode.list Repo.decoder
     in
         apiUrl "/user/repos?sort=updated"
             |> HttpBuilder.get
-            |> HttpBuilder.withExpect expect
             |> withAuthorization accessToken
+            |> withCache etags decoder
             |> HttpBuilder.toRequest
