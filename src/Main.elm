@@ -705,6 +705,11 @@ update msg model =
                                         m =
                                             ms.milestone
 
+                                        issues =
+                                            ms.openIssues
+                                                |> Maybe.withDefault []
+                                                |> retrieveData result
+
                                         updatedMilestone =
                                             { m | openIssues = List.length issues }
                                     in
@@ -718,6 +723,11 @@ update msg model =
                                     let
                                         m =
                                             ms.milestone
+
+                                        issues =
+                                            ms.closedIssues
+                                                |> Maybe.withDefault []
+                                                |> retrieveData result
 
                                         updatedMilestone =
                                             { m | closedIssues = List.length issues }
@@ -736,7 +746,7 @@ update msg model =
                         (\milestones ->
                             Just
                                 (Maybe.withDefault Dict.empty milestones
-                                    |> Dict.update num (updateMilestoneIssues <| issues issuesJson)
+                                    |> Dict.update num updateMilestoneIssues
                                 )
                         )
                         model.milestones
@@ -793,91 +803,86 @@ update msg model =
                         []
                       )
 
-        LoadMilestones milestonesJson ->
+        LoadMilestones result ->
             let
-                result =
-                    milestonesJson
-                        |> Decode.decodeString (Decode.list Milestone.decoder)
+                (u, r) =
+                    model.repo
+
+                thisRepo =
+                    u ++ "/" ++ r
+
+                recentRepos =
+                    thisRepo
+                        :: (model.persistentData.recentRepos
+                                |> List.filter ((/=) thisRepo)
+                                |> List.take 19
+                           )
+
+                milestones =
+                    retrieveData result model.listMilestones
+
+                updatedMilestones =
+                    milestones
+                        |> List.filter
+                            (\ms ->
+                                not model.persistentData.powerOfNow || (ms.dueOn /= Nothing)
+                            )
+                        |> List.foldl
+                            (\ms ->
+                                Dict.update ms.number
+                                    (\m ->
+                                        Just <|
+                                            case m of
+                                                Just m ->
+                                                    { m | milestone = ms }
+
+                                                Nothing ->
+                                                    ExpandedMilestone
+                                                        ms
+                                                        (if ms.openIssues > 0 then
+                                                            Nothing
+                                                         else
+                                                            Just []
+                                                        )
+                                                        (if ms.closedIssues > 0 then
+                                                            Nothing
+                                                         else
+                                                            Just []
+                                                        )
+                                    )
+                            )
+                            (Dict.get model.repo model.milestones |> Maybe.withDefault Dict.empty)
+
+                pd =
+                    model.persistentData
+
+                updatedModel =
+                    { model
+                        | milestones = Dict.insert model.repo updatedMilestones model.milestones
+                        , persistentData = { pd | recentRepos = recentRepos }
+                        , error = Nothing
+                        , listMilestones = milestones
+                    }
             in
-                case result of
-                    Err error ->
-                        { model | error = Just (toString error) } ! []
-
-                    Ok milestones ->
-                        let
-                            (u, r) =
-                                model.repo
-
-                            thisRepo =
-                                u ++ "/" ++ r
-
-                            recentRepos =
-                                thisRepo
-                                    :: (model.persistentData.recentRepos
-                                            |> List.filter ((/=) thisRepo)
-                                            |> List.take 19
-                                       )
-
-                            updatedMilestones =
-                                milestones
-                                    |> List.filter
-                                        (\ms ->
-                                            not model.persistentData.powerOfNow || (ms.dueOn /= Nothing)
-                                        )
-                                    |> List.foldl
-                                        (\ms ->
-                                            Dict.update ms.number
-                                                (\m ->
-                                                    Just <|
-                                                        case m of
-                                                            Just m ->
-                                                                { m | milestone = ms }
-
-                                                            Nothing ->
-                                                                ExpandedMilestone
-                                                                    ms
-                                                                    (if ms.openIssues > 0 then
-                                                                        Nothing
-                                                                     else
-                                                                        Just []
-                                                                    )
-                                                                    (if ms.closedIssues > 0 then
-                                                                        Nothing
-                                                                     else
-                                                                        Just []
-                                                                    )
-                                                )
-                                        )
-                                        (Dict.get model.repo model.milestones |> Maybe.withDefault Dict.empty)
-
-                            pd =
-                                model.persistentData
-
-                            updatedModel =
-                                { model
-                                    | milestones = Dict.insert model.repo updatedMilestones model.milestones
-                                    , persistentData = { pd | recentRepos = recentRepos }
-                                    , error = Nothing
-                                }
-                        in
-                            updatedModel
-                                ! (if model.persistentData.accessToken /= "" then
-                                    (updateLocalStorage updatedModel)
-                                        :: (updatedMilestones
-                                                |> Dict.values
-                                                |> List.map .milestone
-                                                |> List.filter (\ms -> ms.openIssues > 0)
-                                                |> List.map (Request.Issue.listForMilestone model OpenIssue)
-                                           )
-                                        ++ (updatedMilestones
-                                                |> Dict.values
-                                                |> List.map .milestone
-                                                |> List.filter (\ms -> ms.closedIssues > 0)
-                                                |> List.map (Request.Issue.listForMilestone model ClosedIssue)
-                                           )
-                                   else
-                                    []
-                                  )
+                updatedModel
+                    ! (if model.persistentData.accessToken /= "" then
+                        (updateLocalStorage updatedModel)
+                            :: (updatedMilestones
+                                    |> Dict.values
+                                    |> List.map .milestone
+                                    |> List.filter (\ms -> ms.openIssues > 0)
+                                    |> List.map (\ms -> Request.Issue.listForMilestone model OpenIssue ms |> Http.send (MilestoneIssuesLoaded ms.number OpenIssue))
+                                            -- Request.Issue.listForMilestone model OpenIssue ms |> Http.send (MilestoneIssuesLoaded ms.number OpenIssue)
+                               )
+                            ++ (updatedMilestones
+                                    |> Dict.values
+                                    |> List.map .milestone
+                                    |> List.filter (\ms -> ms.closedIssues > 0)
+                                    |> List.map (\ms -> Request.Issue.listForMilestone model ClosedIssue ms |> Http.send (MilestoneIssuesLoaded ms.number ClosedIssue))
+                               )
+                       else
+                        []
+                      )
 
         MilestoneCreated result ->
             case result of
@@ -892,53 +897,61 @@ update msg model =
                                 -- TODO get rid of hack by applying powerOfNow setting on a view level (and separating list on issues with the list of milestones)
                             , persistentData = { s | powerOfNow = False }
                         }
-                            ! [ Request.Milestone.list model
+                            ! [ Request.Milestone.list model.repo model.persistentData.accessToken model.etags |> Http.send LoadMilestones
                               ]
 
                 Err e ->
                     { model | error = toString e |> Just } ! []
 
-        IssuesLoaded column issuesJson ->
+        IssuesLoaded column result ->
             let
-                issues json =
-                    Decode.decodeString (Decode.list Issue.decoder) json
-                        |> Result.toMaybe
+                error = retrieveError result
             in
-                case column of
-                    Current ->
-                        { model | currentIssues = issues issuesJson, error = Nothing }
-                            ! (if model.needFocus then
-                                [ focus model.location ]
-                               else
-                                []
-                              )
+            case column of
+                Current ->
+                    { model
+                        | currentIssues = retrieveData result (Maybe.withDefault [] model.currentIssues) |> Just
+                        , error = error
+                        }
+                        ! (if model.needFocus then
+                            [ focus model.location ]
+                           else
+                            []
+                          )
 
-                    Icebox ->
-                        { model | iceboxIssues = issues issuesJson, error = Nothing }
-                            ! (if model.needFocus then
-                                [ focus model.location ]
-                               else
-                                []
-                              )
+                Icebox ->
+                    { model
+                        | iceboxIssues = retrieveData result (Maybe.withDefault [] model.iceboxIssues) |> Just
+                        , error = error
+                        }
 
-                    Done ->
-                        { model | closedIssues = issues issuesJson, error = Nothing }
-                            ! (if model.needFocus then
-                                [ focus model.location ]
-                               else
-                                []
-                              )
+                        ! (if model.needFocus then
+                            [ focus model.location ]
+                           else
+                            []
+                          )
 
-                    _ ->
-                        model ! []
+                Done ->
+                    { model
+                        | closedIssues = retrieveData result (Maybe.withDefault [] model.closedIssues) |> Just
+                        , error = error
+                        }
+                        ! (if model.needFocus then
+                            [ focus model.location ]
+                           else
+                            []
+                          )
+
+                _ ->
+                    model ! []
 
         CopyText str ->
             model ! [ Ports.clipboard str ]
 
         UnsetMilestone m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
-                ! [ Request.Issue.listForMilestone model OpenIssue m
-                  , Request.Issue.list model Icebox
+                ! [ Request.Issue.listForMilestone model OpenIssue m |> Http.send (MilestoneIssuesLoaded m.number OpenIssue)
+                  , Request.Issue.list model Icebox |> Http.send (IssuesLoaded Icebox)
                   ]
 
         SetMilestone issue milestone ->
@@ -960,54 +973,55 @@ update msg model =
                                 ]
                             )
                             model.persistentData.accessToken
-                            (MilestoneSet milestone)
+                            |> Http.send (MilestoneSet milestone)
                       ]
             else
                 model ! []
 
         MilestoneSet m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
-                ! [ Request.Issue.listForMilestone model OpenIssue m
-                  , Request.Issue.list model Icebox
+                ! [ Request.Issue.listForMilestone model OpenIssue m |> Http.send (MilestoneIssuesLoaded m.number OpenIssue)
+                  , Request.Issue.list model Icebox |> Http.send (IssuesLoaded Icebox)
                   ]
 
         IssueRestarted m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case m of
                     Just milestone ->
-                        [ Request.Issue.listForMilestone model ClosedIssue milestone
-                        , Request.Issue.list model Current
+                        [ Request.Issue.listForMilestone model ClosedIssue milestone |> Http.send (MilestoneIssuesLoaded milestone.number ClosedIssue)
+
+                        , Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
                         ]
 
                     Nothing ->
-                        [ Request.Issue.list model Done
-                        , Request.Issue.list model Current
+                        [ Request.Issue.list model Done |> Http.send (IssuesLoaded Done)
+                        , Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
                         ]
 
         IssueStarted milestone result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case milestone of
                     Just m ->
-                        [ Request.Issue.listForMilestone model OpenIssue m
-                        , Request.Issue.list model Current
+                        [ Request.Issue.listForMilestone model OpenIssue m |> Http.send (MilestoneIssuesLoaded m.number OpenIssue)
+                        , Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
                         ]
 
                     Nothing ->
-                        [ Request.Issue.list model Current
-                        , Request.Issue.list model Icebox
+                        [ Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
+                        , Request.Issue.list model Icebox |> Http.send (IssuesLoaded Icebox)
                         ]
 
         IssueFinished m result ->
             { model | lockedIssueNumber = "", etags = Dict.empty }
                 ! case m of
                     Just m ->
-                        [ Request.Issue.listForMilestone model ClosedIssue m
-                        , Request.Issue.list model Current
+                        [ Request.Issue.listForMilestone model ClosedIssue m |> Http.send (MilestoneIssuesLoaded m.number ClosedIssue)
+                        , Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
                         ]
 
                     Nothing ->
-                        [ Request.Issue.list model Current
-                        , Request.Issue.list model Done
+                        [ Request.Issue.list model Current |> Http.send (IssuesLoaded Current)
+                        , Request.Issue.list model Done |> Http.send (IssuesLoaded Done)
                         ]
 
         DismissPlanningIssue ->
@@ -1020,11 +1034,11 @@ update msg model =
                         case issue.milestone of
                             Just m ->
                                 { model | lockedIssueNumber = issue.number }
-                                    ! [ UnsetMilestone m
-                                            |> Request.Issue.update model.repo
-                                                issue.number
-                                                (Encode.object [ ( "milestone", Encode.null ) ])
-                                                model.persistentData.accessToken
+                                    ! [ Request.Issue.update model.repo
+                                            issue.number
+                                            (Encode.object [ ( "milestone", Encode.null ) ])
+                                            model.persistentData.accessToken
+                                            |> Http.send (UnsetMilestone m)
                                       ]
 
                             Nothing ->
@@ -1052,7 +1066,7 @@ update msg model =
                                                 ]
                                             )
                                             model.persistentData.accessToken
-                                            (IssueStarted issue.milestone)
+                                            |> Http.send (IssueStarted issue.milestone)
                                       ]
 
                             Nothing ->
@@ -1075,7 +1089,7 @@ update msg model =
                                         ]
                                     )
                                     model.persistentData.accessToken
-                                    (IssueFinished issue.milestone)
+                                    |> Http.send (IssueFinished issue.milestone)
                               ]
 
                     "restart" ->
@@ -1096,7 +1110,7 @@ update msg model =
                                         ]
                                     )
                                     model.persistentData.accessToken
-                                    (IssueRestarted issue.milestone)
+                                    |> Http.send (IssueRestarted issue.milestone)
                               ]
 
                     "unstart" ->
@@ -1123,7 +1137,7 @@ update msg model =
                                         ]
                                     )
                                     model.persistentData.accessToken
-                                    (IssueStarted issue.milestone)
+                                    |> Http.send (IssueStarted issue.milestone)
                               ]
 
                     "plan" ->
@@ -1144,7 +1158,7 @@ update msg model =
                                         ]
                                     )
                                     model.persistentData.accessToken
-                                    UrgentIssueAdded
+                                    |> Http.send UrgentIssueAdded
                               ]
 
                     "just do it" ->
@@ -1162,7 +1176,7 @@ update msg model =
                                         ]
                                     )
                                     model.persistentData.accessToken
-                                    UrgentIssueAdded
+                                    |> Http.send UrgentIssueAdded
                               ]
 
                     _ ->
@@ -1383,7 +1397,7 @@ viewPage user model route =
                     |> append groups.earlier "Updated more than a week ago" False
 
         milestonesIndex =
-            Page.Roadmap.view model.roadmap
+            Pages.Roadmap.view model.roadmap
 
         column col colHtml content =
             let
@@ -1464,60 +1478,53 @@ viewPage user model route =
                     (Just <|
                         Html.form [ class "search-issue", style [ ( "display", "inline-block" ), ( "width", "calc(100% - 128px)" ) ], Html.Events.onSubmit SearchIssues ]
                             [ Html.input [ class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
-                            , case model.searchResults of
-                                Loaded issues ->
+                            , if List.length model.searchResults > 0 then
                                     Html.span [ class "clear-search", onClick ClearSearch ] [ text "×" ]
-
-                                _ ->
+                                else
                                     text ""
                             , if model.searchTerms /= "" then
-                                case model.searchResults of
-                                    Loaded issues ->
-                                        Html.span
-                                            [ class
-                                                (if Dict.member model.searchTerms model.persistentData.savedSearches then
-                                                    "saved-search"
-                                                 else
-                                                    "not-saved-search"
-                                                )
-                                            , onClick ToggleSaveSearch
-                                            ]
-                                            [ text "⭐" ]
+                                if List.length model.searchResults > 0 then
+                                    Html.span
+                                        [ class
+                                            (if Dict.member model.searchTerms model.persistentData.savedSearches then
+                                                "saved-search"
+                                             else
+                                                "not-saved-search"
+                                            )
+                                        , onClick ToggleSaveSearch
+                                        ]
+                                        [ text "⭐" ]
 
-                                    _ ->
+                                  else
                                         text ""
                               else
                                 text ""
                             ]
                     )
                     (Just <|
-                        case model.searchResults of
-                            NotRequested ->
-                                div []
-                                    [ Html.a
-                                        [ cellStyle "calc(100% - 10px)"
-                                        , Attrs.target "_blank"
-                                        , Attrs.href "https://help.github.com/articles/searching-issues/#search-within-a-users-or-organizations-repositories"
-                                        ]
-                                        [ text "Github search documentation" ]
-                                    , Html.ul [] <|
-                                        (model.persistentData.savedSearches
-                                            |> Dict.values
-                                            |> List.map
-                                                (\search ->
-                                                    Html.li [ onClick <| SearchBy search ] [ text search ]
-                                                )
-                                        )
+                        if  List.length model.searchResults == 0 then
+                            div []
+                                [ Html.a
+                                    [ cellStyle "calc(100% - 10px)"
+                                    , Attrs.target "_blank"
+                                    , Attrs.href "https://help.github.com/articles/searching-issues/#search-within-a-users-or-organizations-repositories"
                                     ]
+                                    [ text "Github search documentation" ]
+                                , Html.ul [] <|
+                                    (model.persistentData.savedSearches
+                                        |> Dict.values
+                                        |> List.map
+                                            (\search ->
+                                                Html.li [ onClick <| SearchBy search ] [ text search ]
+                                            )
+                                    )
+                                ]
 
-                            Loading ->
-                                text "Loading..."
-
-                            Loaded issues ->
-                                displayIssuesGroupedByDate
-                                    issues
-                                    Icebox
-                                    |> div []
+                        else
+                            displayIssuesGroupedByDate
+                            model.searchResults
+                                Icebox
+                                |> div []
                     )
                 , column Icebox
                     Nothing
@@ -1613,7 +1620,7 @@ viewPage user model route =
                         storiesIndex
 
                     Milestones user repo ->
-                        milestonesIndex
+                        Html.map RoadmapMsgProxy <| milestonesIndex
 
                     Settings user repo ->
                         Html.map SettingsMsgProxy <| viewSettings model
