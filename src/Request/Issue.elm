@@ -1,14 +1,13 @@
 module Request.Issue exposing (create, list, listForMilestone, update, search)
 
-import Http exposing (Error, Response)
+import Http exposing (Error, Response, Request)
 import Data.Issue as Issue exposing (Issue)
 import Data.Milestone as Milestone exposing (Milestone)
-import Json.Decode exposing (Value)
+import Json.Decode as Decode exposing (Value)
 import Models exposing (Model, Filter(..), IssueState(..))
 import Date.Extra as Date exposing (Interval(..))
-import Messages exposing (Msg(..))
 import Request.Helpers exposing (withAuthorization, apiUrl)
-import Request.Cache exposing (cachingFetch)
+import Request.Cache exposing (withCache, CachedResult, CachedRequest)
 import Json.Encode as Encode
 import HttpBuilder
 import Data.Column exposing (Column(..))
@@ -25,7 +24,7 @@ create (user, repo) accessToken data onComplete =
         |> Http.send onComplete
 
 
-list : Model -> Column -> Http.Request (RemoteData (List Issue))
+list : Model -> Column -> CachedRequest (List Issue)
 list model column =
     let
         filter =
@@ -116,30 +115,18 @@ list model column =
 
                 _ ->
                     ""
-        expect =
-            Http.expectJson (Decode.list Issue.decoder)
+        decoder =
+            Decode.list Issue.decoder
 
-        url =
-            apiUrl <|
-                "/repos/"
-                    ++ user
-                    ++ "/"
-                    ++ repo
-                    ++ "/issues"
-                    ++ "?sort=updated"
-                    ++ labels
-                    ++ state
-                    ++ milestone
-                    ++ filterByUser
-                    ++ since
     in
-        url
+        apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues" ++ "?sort=updated" ++ labels ++ state ++ milestone ++ filterByUser ++ since)
+            |> HttpBuilder.get
             |> withAuthorization accessToken
-            |> withCache model.etags expect
+            |> withCache model.etags decoder
             |> HttpBuilder.toRequest
 
 
-listForMilestone : Model -> IssueState -> Milestone -> Cmd Msg
+listForMilestone : Model -> IssueState -> Milestone -> CachedRequest (List Issue)
 listForMilestone model issueState ms =
     let
         filter =
@@ -202,6 +189,9 @@ listForMilestone model issueState ms =
                 OpenIssue ->
                     ""
 
+        decoder =
+            Decode.list Issue.decoder
+
         url =
             apiUrl <|
                 "/repos/"
@@ -216,31 +206,36 @@ listForMilestone model issueState ms =
                     ++ filterByUser
                     ++ since
     in
-        cachingFetch
-            url
-            accessToken
-            model.etags
-            (MilestoneIssuesLoaded ms.number issueState)
+        url
+            |> HttpBuilder.get
+            |> withAuthorization accessToken
+            |> withCache model.etags decoder
+            |> HttpBuilder.toRequest
 
 
-update : (String, String) -> String -> Encode.Value -> String -> (Result Error Issue -> a) -> Cmd a
-update (user, repo) issueNumber issue accessToken onComplete =
+update : (String, String) -> String -> Encode.Value -> String -> Request Issue
+update (user, repo) issueNumber issue accessToken =
     apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues/" ++ issueNumber)
         |> HttpBuilder.patch
         |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
         |> withAuthorization accessToken
         |> HttpBuilder.withBody (Http.jsonBody issue)
         |> HttpBuilder.toRequest
-        |> Http.send onComplete
 
 
-search : Model -> Cmd Msg
+search : Model -> CachedRequest (List Issue)
 search { repo, persistentData, searchTerms, etags } =
     let
-        (u, r) = repo
+        (u, r) =
+            repo
+
+        decoder =
+            Decode.at [ "items" ] <| Decode.list Issue.decoder
+
     in
-    cachingFetch
-        (apiUrl <| "/search/issues?" ++ "q=repo:" ++ u ++ "/" ++ r ++ " " ++ searchTerms)
-        persistentData.accessToken
-        etags
-        IssuesSearchResults
+        apiUrl ("/search/issues?" ++ "q=repo:" ++ u ++ "/" ++ r ++ " " ++ searchTerms)
+            |> HttpBuilder.get
+            |> withAuthorization persistentData.accessToken
+            |> withCache etags decoder
+            |> HttpBuilder.toRequest
+

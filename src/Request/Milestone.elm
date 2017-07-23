@@ -1,17 +1,16 @@
 module Request.Milestone exposing (create, list)
 
-import Http exposing (Error, Response)
-import Messages exposing (Msg(..))
+import Http exposing (Error, Response, Request)
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Encode as Encode
-import Models exposing (Model)
+import Json.Decode as Decode
 import Request.Helpers exposing (apiUrl, withAuthorization)
-import Request.Cache exposing (withCache, RemoteData)
+import Request.Cache exposing (withCache, CachedRequest, Etags)
 import HttpBuilder exposing (withExpect, withBody)
 import Util exposing ((=>))
 
 
-create : (String, String) -> String -> String -> Cmd Msg
+create : (String, String) -> String -> String -> Request Milestone
 create (user, repo) title accessToken =
     let
         body =
@@ -26,17 +25,19 @@ create (user, repo) title accessToken =
             |> withExpect (Http.expectJson Milestone.decoder)
             |> withBody body
             |> HttpBuilder.toRequest
-            |> Http.send MilestoneCreated
 
 
-list : Model -> Cmd Msg
-list { repo, persistentData, etags } =
+list : (String, String) -> String -> Etags ->  CachedRequest (List Milestone)
+list repo accessToken etags =
     let
         (u, r) =
             repo
 
+        decoder =
+            Decode.list Milestone.decoder
     in
         apiUrl ("/repos/" ++ u ++ "/" ++ r ++ "/milestones")
             |> HttpBuilder.get
-            |> withAuthorization persistentData.accessToken
-            |> withCache etags
+            |> withAuthorization accessToken
+            |> withCache etags decoder
+            |> HttpBuilder.toRequest
