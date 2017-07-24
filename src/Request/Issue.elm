@@ -6,27 +6,34 @@ import Data.Milestone as Milestone exposing (Milestone)
 import Json.Decode as Decode exposing (Value)
 import Date exposing (Date)
 import Date.Extra as Date exposing (Interval(..))
-import Request.Helpers exposing (withAuthorization, apiUrl)
+import Request.Helpers exposing (withAuthorization, repoUrl, apiUrl)
 import Request.Cache exposing (Etags, withCache, CachedResult, CachedRequest)
 import Json.Encode as Encode
 import HttpBuilder
 import Data.Column exposing (Column(..))
 import Data.Filter exposing (Filter(..))
+import Util exposing ((=>))
 
 
-create : (String, String) -> String -> Value -> (Result Error Issue -> a) -> Cmd a
-create (user, repo) accessToken data onComplete =
-    apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues")
-        |> HttpBuilder.post
-        |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
-        |> HttpBuilder.withBody (Http.jsonBody data)
-        |> withAuthorization accessToken
-        |> HttpBuilder.toRequest
-        |> Http.send onComplete
+create : (String, String) -> String -> Value -> Request Issue
+create repo accessToken data =
+    let
+        body =
+            Http.jsonBody data
+
+        expect =
+            Http.expectJson Issue.decoder
+    in
+        repoUrl repo "/issues"
+            |> HttpBuilder.post
+            |> withAuthorization accessToken
+            |> HttpBuilder.withExpect expect
+            |> HttpBuilder.withBody body
+            |> HttpBuilder.toRequest
 
 
 list : String -> Date -> String -> Filter -> (String, String) -> Column -> Etags -> CachedRequest (List Issue)
-list doneLimit now accessToken filter (user, repo) column etags =
+list doneLimit now accessToken filter repo column etags =
     let
 
         milestone =
@@ -40,31 +47,20 @@ list doneLimit now accessToken filter (user, repo) column etags =
                 _ ->
                     ""
 
-        labels =
+        (labels, state) =
             case column of
-                Icebox ->
-                    ""
-
-                Search ->
-                    ""
-
                 Backlog ->
-                    "&labels=Status: Ready"
+                    "&labels=Status: Ready" => ""
 
                 Current ->
-                    "&labels=Status: In Progress"
+                    "&labels=Status: In Progress" => ""
 
                 Done ->
-                    -- "&labels=Status: Completed"
-                    ""
-
-        state =
-            case column of
-                Done ->
-                    "&state=closed"
+                    "" => "&state=closed"
 
                 _ ->
-                    ""
+                    "" => ""
+
 
         filterByUser =
             case filter of
@@ -88,23 +84,18 @@ list doneLimit now accessToken filter (user, repo) column etags =
                 |> (++) "&since="
 
         since =
-            case column of
-                Done ->
-                    case doneLimit of
-                        "a day" ->
-                            pastMoment -1 Day
+            case (column, doneLimit) of
+                (Done, "a day") ->
+                    pastMoment -1 Day
 
-                        "a week" ->
-                            pastMoment -1 Week
+                (Done, "a week") ->
+                    pastMoment -1 Week
 
-                        "two weeks" ->
-                            pastMoment -2 Week
+                (Done, "two weeks") ->
+                    pastMoment -2 Week
 
-                        "a month" ->
-                            pastMoment -1 Month
-
-                        _ ->
-                            ""
+                (Done, "a month") ->
+                    pastMoment -1 Month
 
                 _ ->
                     ""
@@ -112,7 +103,7 @@ list doneLimit now accessToken filter (user, repo) column etags =
             Decode.list Issue.decoder
 
     in
-        apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues" ++ "?sort=updated" ++ labels ++ state ++ milestone ++ filterByUser ++ since)
+        repoUrl repo ("/issues?sort=updated" ++ labels ++ state ++ milestone ++ filterByUser ++ since)
             |> HttpBuilder.get
             |> withAuthorization accessToken
             |> withCache etags decoder
@@ -120,7 +111,7 @@ list doneLimit now accessToken filter (user, repo) column etags =
 
 
 listForMilestone : String -> Date -> String -> Filter -> (String, String) -> IssueState -> Milestone -> Etags -> CachedRequest (List Issue)
-listForMilestone doneLimit now accessToken filter (user, repo) issueState ms etags =
+listForMilestone doneLimit now accessToken filter repo issueState ms etags =
     let
 
         state =
@@ -178,12 +169,8 @@ listForMilestone doneLimit now accessToken filter (user, repo) issueState ms eta
             Decode.list Issue.decoder
 
         url =
-            apiUrl <|
-                "/repos/"
-                    ++ user
-                    ++ "/"
-                    ++ repo
-                    ++ "/issues?"
+            repoUrl repo <|
+                    "/issues?"
                     ++ state
                     ++ "&sort=updated"
                     ++ "&milestone="
@@ -199,8 +186,8 @@ listForMilestone doneLimit now accessToken filter (user, repo) issueState ms eta
 
 
 update : (String, String) -> String -> Encode.Value -> String -> Request Issue
-update (user, repo) issueNumber issue accessToken =
-    apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues/" ++ issueNumber)
+update repo issueNumber issue accessToken =
+    repoUrl repo ("/issues/" ++ issueNumber)
         |> HttpBuilder.patch
         |> HttpBuilder.withExpect (Http.expectJson Issue.decoder)
         |> withAuthorization accessToken

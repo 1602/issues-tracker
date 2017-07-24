@@ -502,8 +502,8 @@ update msg model pd =
                 cmd =
                     if model.newIssueTitle /= "" then
                         [ setFocus "create-story"
-                        , StoryCreated col milestone
-                            |> Request.Issue.create model.repo pd.accessToken encodedIssue
+                        , Request.Issue.create model.repo pd.accessToken encodedIssue
+                            |> Http.send (StoryCreated col milestone)
                         ]
                     else
                         []
