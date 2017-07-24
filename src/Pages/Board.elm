@@ -156,7 +156,7 @@ init pd location =
 
 listForMilestone : Model -> PersistentData -> IssueState -> Milestone -> Cmd Msg
 listForMilestone model pd issueState ms =
-    Request.Issue.listForMilestone 
+    Request.Issue.listForMilestone
         pd.doneLimit
         model.now
         pd.accessToken
@@ -1183,95 +1183,6 @@ subscriptions model =
 view : Model -> PersistentData -> Html Msg
 view model persistentData =
     let
-        error =
-            case model.error of
-                Just error ->
-                    div
-                        [ style
-                            [ ( "position", "fixed" )
-                            , ( "top", "10px" )
-                            , ( "right", "10px" )
-                            , ( "border", "1px solid red" )
-                            , ( "color", "crimson" )
-                            , ( "background", "#111" )
-                            , ( "padding", "10px" )
-                            , ( "border-radius", "2px" )
-                            , ( "max-width", "500px" )
-                            , ( "max-height", "350px" )
-                            , ( "overflow", "auto" )
-                            , ( "box-shadow", "0px 0px 17px 9px rgba(5,5,5,0.35)" )
-                            ]
-                        ]
-                        [ text error ]
-
-                Nothing ->
-                    text ""
-
-        pickMilestoneModal issue =
-            div
-                [ style
-                    [ ( "position", "fixed" )
-                    , ( "top", "70px" )
-                    , ( "left", "50%" )
-                    , ( "margin-left", "-200px" )
-                    , ( "width", "400px" )
-                    , ( "padding", "10px" )
-                    , ( "background", "#777" )
-                    , ( "border", "2px solid #bbb" )
-                    ]
-                ]
-                [ div [] [ text "Select milestone for issue " ]
-                , Html.strong [] [ text <| "#" ++ issue.number ]
-                , text <| " " ++ issue.title
-                , Html.hr [] []
-                , model.milestones
-                    |> Dict.get model.repo
-                    |> Maybe.withDefault Dict.empty
-                    |> Dict.values
-                    |> List.map
-                        (\s ->
-                            Html.li [ style [ ( "list-style", "none" ) ] ] [ Html.button [ onClick <| SetMilestone issue s.milestone ] [ text s.milestone.title ] ]
-                        )
-                    |> (\list ->
-                            list
-                                ++ [ Html.li [ style [ ( "list-style", "none" ) ] ]
-                                        [ Html.input [ onInput EditNewMilestoneTitle ] []
-                                        , Html.button [ onClick CreateNewMilestone ] [ text "Create" ]
-                                        ]
-                                   ]
-                       )
-                    |> Html.ul []
-                , Html.hr [] []
-                , Html.button [ onClick DismissPlanningIssue ] [ text "Dismiss" ]
-                ]
-    in
-        div [ style [ ( "display", "flex" ) ] ] <|
-            -- TODO: view navigation!!!
-            --[ viewNavigation model.user model
-            [ if persistentData.accessToken /= "" then
-                -- TODO: where's user?
-                --viewPage model.user model <| parseHash model.location
-                text ""
-              else
-                div []
-                    [ text "cheers. visit "
-                    , Html.a [ Attrs.href "https://github.com/settings/tokens" ] [ text "https://github.com/settings/tokens" ]
-                    , text " (we need 'repo' access granted to see all private repositories)"
-                    , Html.br [] []
-                    , text "and fill this input "
-                    , Html.input [ onInput EditAccessToken ] []
-                    , Html.button [ onClick SaveAccessToken ] [ text "then press this button" ]
-                    ]
-            , error
-            , model.pickMilestoneForIssue
-                |> Maybe.andThen (pickMilestoneModal >> Just)
-                |> Maybe.withDefault (text "")
-            ]
-
-
-viewPage : Maybe User -> Model -> Maybe Route -> PersistentData -> Html Msg
-viewPage user model route persistentData =
-    let
         displayIssuesWithinMilestones milestones issueState =
             case milestones of
                 Just milestones ->
@@ -1571,7 +1482,7 @@ viewPage user model route persistentData =
                     )
                 ]
     in
-        text ""
+        storiesIndex
 
 
 columnTitle : Column -> ( String, String, String )
