@@ -5,6 +5,7 @@ import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional)
 import Json.Encode as Encode exposing (Value)
 import Dict exposing (Dict)
 import Data.Column exposing (Column(..))
+import Data.User exposing (User)
 import Util exposing ((=>))
 
 
@@ -18,6 +19,7 @@ type alias PersistentData =
     , recentRepos : List String
     , doneLimit : String
     , powerOfNow : Bool
+    , user : Maybe User
     }
 
 
@@ -33,6 +35,7 @@ default =
         []
         "a day"
         False
+        Nothing
 
 
 decoder : Decoder PersistentData
@@ -47,6 +50,7 @@ decoder =
         |> optional "recentRepos" (list string) []
         |> optional "doneLimit" string "a day"
         |> optional "powerOfNow" bool False
+        |> optional "user" (nullable Data.User.decoder) Nothing
 
 
 encode : PersistentData -> Value
@@ -60,6 +64,7 @@ encode pd =
     , "recentRepos" => Encode.list (List.map Encode.string pd.recentRepos)
     , "doneLimit" => Encode.string pd.doneLimit
     , "powerOfNow" => Encode.bool pd.powerOfNow
+    , "user" => Encode.null
     ]
         |> Encode.object
 
