@@ -5,7 +5,6 @@ import Html exposing (Html, span, text, img, div)
 import Navigation exposing (programWithFlags, Location)
 import Http exposing (Error(..), Response)
 import Html.Attributes as Attrs exposing (style, class, attribute, src)
-import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
 import Data.Issue as Issue exposing (Issue)
 import Data.User as User exposing (User)
@@ -17,6 +16,7 @@ import Pages.Repos
 import Pages.Roadmap
 import Pages.Board
 import Pages.Setup
+import Pages.Settings
 
 
 main : Program Value Model Msg
@@ -150,9 +150,9 @@ hasNoLabel label issue =
     not <| hasLabel label issue
 
 
-updateLocalStorage : Model -> Cmd msg
-updateLocalStorage model =
-    model.persistentData
+updateLocalStorage : PersistentData -> Cmd msg
+updateLocalStorage persistentData =
+    persistentData
         |> Data.PersistentData.encode
         |> saveData
 
@@ -162,7 +162,7 @@ updateLocalStorage model =
 
 
 type Msg
-    = SettingsMsgProxy SettingsMsg
+    = SettingsMsgProxy Pages.Settings.Msg
     | RoadmapMsgProxy Pages.Roadmap.Msg
     | ReposMsgProxy Pages.Repos.Msg
     | SetupMsgProxy Pages.Setup.Msg
@@ -171,27 +171,6 @@ type Msg
     | LoadUser (Result Error User)
 
 
-type SettingsMsg
-    = ChangeDefaultRepositoryType String
-    | UpdateDefaultRepository String
-    | ChangeDoneLimit String
-    | IgnoreIdeas
-
-
-updateSettings : SettingsMsg -> PersistentData -> PersistentData
-updateSettings msg settings =
-    case msg of
-        IgnoreIdeas ->
-            { settings | powerOfNow = not settings.powerOfNow }
-
-        ChangeDoneLimit s ->
-            { settings | doneLimit = s }
-
-        UpdateDefaultRepository s ->
-            { settings | defaultRepository = s }
-
-        ChangeDefaultRepositoryType s ->
-            { settings | defaultRepositoryType = s }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -200,10 +179,9 @@ update msg model =
     case msg of
         SettingsMsgProxy msg ->
             let
-                updatedModel =
-                    { model | persistentData = updateSettings msg model.persistentData }
+                upd = Pages.Settings.update msg model.persistentData
             in
-                updatedModel ! [ updateLocalStorage updatedModel ]
+                model ! [ updateLocalStorage upd ]
 
         ReposMsgProxy msg ->
             { model | repos = Pages.Repos.update msg model.repos } ! []
@@ -289,61 +267,8 @@ viewPage user model route =
                     Html.map RoadmapMsgProxy <| Pages.Roadmap.view model.roadmap
 
                 Settings user repo ->
-                    Html.map SettingsMsgProxy <| viewSettings model
+                    Html.map SettingsMsgProxy <| Pages.Settings.view model.persistentData
 
-
-viewSettings : Model -> Html SettingsMsg
-viewSettings model =
-    let
-        select onSelect values currentValue =
-            Html.select [ onInput onSelect ] <| options values currentValue
-
-        options values currentValue =
-            values
-                |> List.map (option currentValue)
-
-        option current value =
-            Html.option [ Attrs.selected <| value == current ] [ text value ]
-
-        settingsBlock title contents =
-            div [ style [ ( "background", "#333" ), ( "border", "1px solid #555" ), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
-    in
-        Html.main_ [ style [ ( "padding", "10px" ), ( "overflow-y", "auto" ), ( "height", "100vh" ), ( "width", "100vw" ) ] ]
-            -- default repo
-            [ settingsBlock "Default repository"
-                [ select ChangeDefaultRepositoryType [ "last visited", "specified" ] model.persistentData.defaultRepositoryType
-                , if model.persistentData.defaultRepositoryType == "specified" then
-                    Html.input [ Attrs.value model.persistentData.defaultRepository, onInput UpdateDefaultRepository ] []
-                  else
-                    text ""
-                , Html.p [] [ text "this setting controls repository which will be opened when visiting the kanban app" ]
-                ]
-              -- limit
-            , settingsBlock "Limit for 'We just did it'"
-                [ select ChangeDoneLimit [ "a day", "a week", "two weeks", "a month" ] model.persistentData.doneLimit
-                , Html.p [] [ text "we only pull fresh issues in 'Done' column, here you can configure what is 'fresh'" ]
-                ]
-              -- focused mode: ignore milestones with no due date
-            , settingsBlock "Focus on present, ignore ideas"
-                [ Html.label []
-                    [ Html.input [ Attrs.checked model.persistentData.powerOfNow, Attrs.type_ "checkbox", onClick IgnoreIdeas ] []
-                    , text " ignore milestones with no due date"
-                    ]
-                , Html.p []
-                    [ text <|
-                        (if model.persistentData.powerOfNow then
-                            "keep this box ticked"
-                         else
-                            "tick this box"
-                        )
-                    , text " if you don't want to be bothered by the things that will not happen in the nearest future"
-                    ]
-                ]
-            , settingsBlock "App Version"
-                [ Html.strong [] [ text model.version ]
-                , Html.p [] [ text "this app is in active development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and possibly grab some new bugs at the same time, sorry), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
-                ]
-            ]
 
 
 viewNavigation : Maybe User -> Model -> Html Msg

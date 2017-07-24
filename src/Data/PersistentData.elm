@@ -19,6 +19,7 @@ type alias PersistentData =
     , recentRepos : List String
     , doneLimit : String
     , powerOfNow : Bool
+    , version : String
     , user : Maybe User
     }
 
@@ -35,6 +36,7 @@ default =
         []
         "a day"
         False
+        "1.0.0"
         Nothing
 
 
@@ -50,6 +52,7 @@ decoder =
         |> optional "recentRepos" (list string) []
         |> optional "doneLimit" string "a day"
         |> optional "powerOfNow" bool False
+        |> optional "version" string "1.0.0"
         |> optional "user" (nullable Data.User.decoder) Nothing
 
 
