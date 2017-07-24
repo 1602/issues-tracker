@@ -10,13 +10,13 @@ import Request.Cache exposing (Etags, CachedResult, retrieveData, updateCache, r
 import Date exposing (Date)
 import Time exposing (Time)
 import Date.Distance as Distance
+import Data.PersistentData exposing (PersistentData)
 
 type Msg =
     LoadMilestones (CachedResult (List Milestone))
 
 type alias Model =
     { list : List Milestone
-    , accessToken : String
     , repo : (String, String)
     , cache : Etags
     , now : Date
@@ -24,13 +24,12 @@ type alias Model =
     }
 
 
-init : String -> (String, String) -> (Model, Cmd Msg)
-init accessToken repo =
+init : PersistentData -> (String, String) -> (Model, Cmd Msg)
+init pd repo =
     let
         model =
             Model
                 []
-                accessToken
                 repo
                 -- cache
                 Dict.empty
@@ -39,7 +38,7 @@ init accessToken repo =
                 -- error
                 Nothing
     in
-       model ! [ Request.Milestone.list model.repo model.accessToken model.cache |> Http.send LoadMilestones ]
+       model ! [ Request.Milestone.list model.repo pd.accessToken model.cache |> Http.send LoadMilestones ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg)
