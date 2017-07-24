@@ -4,8 +4,6 @@ import Route exposing (Route, Route(..), parseHash)
 import Html exposing (Html, span, text, img, div)
 import Navigation exposing (programWithFlags, Location)
 import Http exposing (Error(..), Response)
-import Date
-import Time
 import Html.Attributes as Attrs exposing (style, class, attribute, src)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
@@ -13,7 +11,6 @@ import Data.Issue as Issue exposing (Issue)
 import Data.User as User exposing (User)
 import Request.User
 import Data.PersistentData exposing (PersistentData)
-import Data.Column exposing (Column(..))
 import Json.Decode exposing (Value)
 import Ports exposing (saveData)
 import Pages.Repos
@@ -137,6 +134,7 @@ init initialData location =
                 Request.User.get persistentData.accessToken |> Http.send LoadUser
             , Cmd.map ReposMsgProxy cmdRepos
             , Cmd.map RoadmapMsgProxy cmdRoadmap
+            , Cmd.map BoardMsgProxy cmdBoard
             ]
 
 
@@ -272,50 +270,26 @@ view model =
 
 viewPage : Maybe User -> Model -> Maybe Route -> Html Msg
 viewPage user model route =
-    let
-        milestonesIndex =
-            Pages.Roadmap.view model.roadmap
-    in
-        case route of
-            Nothing ->
-                Html.map ReposMsgProxy <| Pages.Repos.view model.repos
+    case route of
+        Nothing ->
+            Html.map ReposMsgProxy <| Pages.Repos.view model.repos
 
-            Just r ->
-                case r of
-                    Repos ->
-                        Html.map ReposMsgProxy <| Pages.Repos.view model.repos
+        Just r ->
+            case r of
+                Repos ->
+                    Html.map ReposMsgProxy <| Pages.Repos.view model.repos
 
-                    Story user repo id ->
-                        Html.map BoardMsgProxy <| Pages.Board.view model.board model.persistentData
+                Story user repo id ->
+                    Html.map BoardMsgProxy <| Pages.Board.view model.board model.persistentData
 
+                Stories user repo ->
+                    Html.map BoardMsgProxy <| Pages.Board.view model.board model.persistentData
 
-                    Stories user repo ->
-                        Html.map BoardMsgProxy <| Pages.Board.view model.board model.persistentData
+                Milestones user repo ->
+                    Html.map RoadmapMsgProxy <| Pages.Roadmap.view model.roadmap
 
-                    Milestones user repo ->
-                        Html.map RoadmapMsgProxy <| milestonesIndex
-
-                    Settings user repo ->
-                        Html.map SettingsMsgProxy <| viewSettings model
-
-
-columnTitle : Column -> ( String, String, String )
-columnTitle col =
-    case col of
-        Search ->
-            ( "🔎", "Search", "" )
-
-        Icebox ->
-            ( "❄", "Icebox", "(keep this place empty)" )
-
-        Backlog ->
-            ( "🚥", "Backlog", "(plan all the things via milestones)" )
-
-        Current ->
-            ( "🐝", "In progress", "(issues with status 'In Progress')" )
-
-        Done ->
-            ( "🎉", "Done", "(closed issues)" )
+                Settings user repo ->
+                    Html.map SettingsMsgProxy <| viewSettings model
 
 
 viewSettings : Model -> Html SettingsMsg
@@ -370,88 +344,6 @@ viewSettings model =
                 , Html.p [] [ text "this app is in active development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and possibly grab some new bugs at the same time, sorry), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
                 ]
             ]
-
-
-
-
-buttonStyle : List ( String, String )
-buttonStyle =
-    [ ( "margin-right", "15px" )
-    , ( "margin-top", "9px" )
-    , ( "border", "0px" )
-    , ( "background", "#eee" )
-    , ( "color", "#222" )
-    , ( "cursor", "pointer" )
-    , ( "box-shadow", "0px 0px 0px 5px rgba(5,5,5,0.2)" )
-    , ( "border-radius", "1px" )
-    , ( "font-family", "Fira Code, Iosevka, menlo, monospace" )
-    ]
-
-
-intToDate : Int -> Date.Date
-intToDate ms =
-    ms
-        |> toFloat
-        |> (\ms -> Time.millisecond * ms)
-        |> Date.fromTime
-
-
-cellStyle : String -> Html.Attribute msg
-cellStyle width =
-    style
-        [ ( "padding", "10px" )
-        , ( "margin", "2px" )
-        , ( "vertical-align", "top" )
-        , ( "width", width )
-          -- , ( "font-family", "monospace" )
-        , ( "overflow", "hidden" )
-        , ( "text-overflow", "ellipsis" )
-        , ( "display", "inline-block" )
-        , ( "background", "rgba(255,255,255,0.1)" )
-        , ( "position", "relative" )
-        , ( "box-sizing", "border-box" )
-        ]
-
-
-cellExStyle : List ( String, String ) -> Html.Attribute msg
-cellExStyle list =
-    style
-        ([ ( "padding", "10px" )
-         , ( "margin", "2px" )
-         , ( "vertical-align", "top" )
-         , ( "width", "calc(100% - 4px)" )
-           -- , ( "font-family", "monospace" )
-         , ( "overflow", "hidden" )
-         , ( "text-overflow", "ellipsis" )
-         , ( "display", "inline-block" )
-         , ( "background", "rgba(255,255,255,0.1)" )
-         , ( "position", "relative" )
-         , ( "box-sizing", "border-box" )
-         , ( "line-height", "22px" )
-         ]
-            ++ list
-        )
-
-
-shortenUuid : String -> String
-shortenUuid uuid =
-    (String.left 9 uuid) ++ "..." ++ (String.right 4 uuid)
-
-
-formField : String -> Html msg -> Html msg
-formField label control =
-    div [ style [ ( "padding", "10px" ) ] ]
-        [ Html.label [] [ text label, div [ style [ ( "margin-top", "5px" ) ] ] [ control ] ] ]
-
-
-textareaStyle : Html.Attribute msg
-textareaStyle =
-    Attrs.style
-        [ ( "width", "100%" )
-        , ( "height", "400px" )
-        , ( "padding", "5px" )
-        , ( "color", "#0F0" )
-        ]
 
 
 viewNavigation : Maybe User -> Model -> Html Msg
