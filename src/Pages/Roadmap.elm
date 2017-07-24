@@ -20,6 +20,7 @@ type alias Model =
     , repo : (String, String)
     , cache : Etags
     , now : Date
+    , error : Maybe String
     }
 
 
@@ -35,13 +36,21 @@ init accessToken repo =
                 Dict.empty
                 -- now
                 (Date.fromTime <| Time.millisecond * (toFloat 0))
+                -- error
+                Nothing
     in
        model ! [ Request.Milestone.list model.repo model.accessToken model.cache |> Http.send LoadMilestones ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg)
 update msg model =
-    model ! []
+    case msg of
+        LoadMilestones result ->
+            { model
+                | list = retrieveData result model.list
+                , error = retrieveError result
+                , cache = updateCache result model.cache
+                } ! []
 
 
 view : Model -> Html Msg

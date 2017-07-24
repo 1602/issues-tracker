@@ -70,6 +70,8 @@ init initialData location =
                     (user, repo)
                 Just (Settings user repo) ->
                     (user, repo)
+                Just (Milestones user repo) ->
+                    (user, repo)
                 _ ->
                     ("", "")
 
@@ -176,6 +178,7 @@ init initialData location =
                ]
                 ++ (loadResource model)
                 ++ [Cmd.map ReposMsgProxy cmdRepos]
+                ++ [Cmd.map RoadmapMsgProxy cmdRoadmap]
               )
 
 
@@ -623,7 +626,18 @@ update msg model =
             { model | now = now } ! []
 
         CurrentTime now ->
-            { model | now = Date.fromTime now } ! loadAllIssues model
+            let
+                page = parseHash model.location
+            in
+                { model | now = Date.fromTime now } !
+                (case page of
+                    Just (Stories _ _) ->
+                        loadAllIssues model
+                    Just (Story _ _ _) ->
+                        loadAllIssues model
+                    _ ->
+                        []
+                )
 
         UrlChange location ->
             let
