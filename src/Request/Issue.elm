@@ -1,16 +1,17 @@
 module Request.Issue exposing (create, list, listForMilestone, update, search)
 
 import Http exposing (Error, Response, Request)
-import Data.Issue as Issue exposing (Issue)
+import Data.Issue as Issue exposing (Issue, IssueState(..))
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Decode as Decode exposing (Value)
-import Models exposing (Model, Filter(..), IssueState(..))
+import Date exposing (Date)
 import Date.Extra as Date exposing (Interval(..))
 import Request.Helpers exposing (withAuthorization, apiUrl)
-import Request.Cache exposing (withCache, CachedResult, CachedRequest)
+import Request.Cache exposing (Etags, withCache, CachedResult, CachedRequest)
 import Json.Encode as Encode
 import HttpBuilder
 import Data.Column exposing (Column(..))
+import Data.Filter exposing (Filter(..))
 
 
 create : (String, String) -> String -> Value -> (Result Error Issue -> a) -> Cmd a
@@ -24,17 +25,9 @@ create (user, repo) accessToken data onComplete =
         |> Http.send onComplete
 
 
-list : Model -> Column -> CachedRequest (List Issue)
-list model column =
+list : String -> Date -> String -> Filter -> (String, String) -> Column -> Etags -> CachedRequest (List Issue)
+list doneLimit now accessToken filter (user, repo) column etags =
     let
-        filter =
-            model.filter
-
-        (user, repo) =
-            model.repo
-
-        accessToken =
-            model.persistentData.accessToken
 
         milestone =
             case column of
@@ -88,7 +81,7 @@ list model column =
                     ""
 
         pastMoment duration interval =
-            model.now
+            now
                 |> Date.add interval duration
                 |> Date.floor Hour
                 |> Date.toUtcIsoString
@@ -97,7 +90,7 @@ list model column =
         since =
             case column of
                 Done ->
-                    case model.persistentData.doneLimit of
+                    case doneLimit of
                         "a day" ->
                             pastMoment -1 Day
 
@@ -122,21 +115,13 @@ list model column =
         apiUrl ("/repos/" ++ user ++ "/" ++ repo ++ "/issues" ++ "?sort=updated" ++ labels ++ state ++ milestone ++ filterByUser ++ since)
             |> HttpBuilder.get
             |> withAuthorization accessToken
-            |> withCache model.etags decoder
+            |> withCache etags decoder
             |> HttpBuilder.toRequest
 
 
-listForMilestone : Model -> IssueState -> Milestone -> CachedRequest (List Issue)
-listForMilestone model issueState ms =
+listForMilestone : String -> Date -> String -> Filter -> (String, String) -> IssueState -> Milestone -> Etags -> CachedRequest (List Issue)
+listForMilestone doneLimit now accessToken filter (user, repo) issueState ms etags =
     let
-        filter =
-            model.filter
-
-        (user, repo) =
-            model.repo
-
-        accessToken =
-            model.persistentData.accessToken
 
         state =
             case issueState of
@@ -161,7 +146,7 @@ listForMilestone model issueState ms =
                     ""
 
         pastMoment duration interval =
-            model.now
+            now
                 |> Date.add interval duration
                 |> Date.floor Hour
                 |> Date.toUtcIsoString
@@ -170,7 +155,7 @@ listForMilestone model issueState ms =
         since =
             case issueState of
                 ClosedIssue ->
-                    case model.persistentData.doneLimit of
+                    case doneLimit of
                         "a day" ->
                             pastMoment -1 Day
 
@@ -209,7 +194,7 @@ listForMilestone model issueState ms =
         url
             |> HttpBuilder.get
             |> withAuthorization accessToken
-            |> withCache model.etags decoder
+            |> withCache etags decoder
             |> HttpBuilder.toRequest
 
 
@@ -223,19 +208,16 @@ update (user, repo) issueNumber issue accessToken =
         |> HttpBuilder.toRequest
 
 
-search : Model -> CachedRequest (List Issue)
-search { repo, persistentData, searchTerms, etags } =
+search : (String, String) -> String -> String -> Etags -> CachedRequest (List Issue)
+search (u, r) accessToken searchTerms etags =
     let
-        (u, r) =
-            repo
-
         decoder =
             Decode.at [ "items" ] <| Decode.list Issue.decoder
 
     in
         apiUrl ("/search/issues?" ++ "q=repo:" ++ u ++ "/" ++ r ++ " " ++ searchTerms)
             |> HttpBuilder.get
-            |> withAuthorization persistentData.accessToken
+            |> withAuthorization accessToken
             |> withCache etags decoder
             |> HttpBuilder.toRequest
 

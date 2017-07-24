@@ -2,7 +2,6 @@ module Request.User exposing (get)
 
 import Base64
 import Http exposing (Error, Response)
-import Messages exposing (Msg(..))
 import Dict
 import Data.User as User exposing (User)
 import Json.Decode as Decode
@@ -10,7 +9,7 @@ import HttpBuilder exposing (withHeader)
 import Request.Helpers exposing (withAuthorization)
 
 
-get : String -> Cmd Msg
+get : String -> Http.Request User
 get accessToken =
     let
         expect =
@@ -39,7 +38,6 @@ get accessToken =
             |> withAuthorization accessToken
             |> withHeader "if-modified-since" "0"
             |> HttpBuilder.toRequest
-            |> Http.send LoadUser
 
 
 buildAuthHeader : String -> String
