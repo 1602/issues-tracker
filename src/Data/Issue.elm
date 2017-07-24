@@ -1,4 +1,4 @@
-module Data.Issue exposing (Issue, decoder)
+module Data.Issue exposing (Issue, IssueState(..), decoder)
 
 import Decoders exposing (intToString, stringToDate)
 import Json.Decode as Decode exposing (Decoder, field, nullable, maybe)
@@ -7,6 +7,10 @@ import Date exposing (Date)
 import Data.User as User exposing (User)
 import Data.Label as Label exposing (Label)
 import Data.Milestone as Milestone exposing (Milestone)
+
+
+type IssueState = OpenIssue | ClosedIssue
+
 
 type alias Issue =
     { number : String
