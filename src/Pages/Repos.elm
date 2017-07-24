@@ -1,7 +1,7 @@
 module Pages.Repos exposing (Msg, Model, view, init, update)
 
 import Http exposing (Error)
-import Html exposing (div, text, ul, li)
+import Html exposing (div, text, ul, li, text)
 import Html.Attributes exposing (href)
 import Data.Repo as Repo exposing (Repo)
 import Request.Repo
@@ -38,9 +38,10 @@ view model =
         |> List.map (\x -> li []
             [ Html.a
                 [ href <| "#/" ++ x.fullName ++ "/stories" ]
-                [ text x.fullName
+                [ Html.h4 [] [ text x.fullName ]
                 ]
             , text <| " (" ++ (toString x.openIssuesCount) ++ " open issues)"
+            , div [] [ text (x.description |> Maybe.withDefault "") ]
             ] )
         |> ul []
 
