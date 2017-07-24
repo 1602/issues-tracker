@@ -1,7 +1,5 @@
 module Messages exposing (..)
 
-import Models exposing (..)
--- import Base exposing (..)
 import Http exposing (Error, Response)
 import Date
 import Time
@@ -17,7 +15,6 @@ import Request.Cache exposing (CachedResult)
 type Msg
     = NoOp
     | LoadMilestones (CachedResult (List Milestone))
-    | MilestoneIssuesLoaded String IssueState (CachedResult (List Issue))
     | CurrentDate Date.Date
     | CurrentTime Time.Time
     | UrlChange Location
@@ -58,10 +55,4 @@ type Msg
     | ToggleSaveSearch
     | SearchBy String
     | ClearSearch
-
-type SettingsMsg
-    = ChangeDefaultRepositoryType String
-    | UpdateDefaultRepository String
-    | ChangeDoneLimit String
-    | IgnoreIdeas
 
