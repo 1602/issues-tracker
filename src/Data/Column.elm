@@ -15,26 +15,28 @@ type Column
 decoder : Decoder Column
 decoder =
     Decode.string
-        |> Decode.andThen (\str ->
-            case str of
-                "Current" ->
-                    Decode.succeed Current
+        |> Decode.andThen
+            (\str ->
+                case str of
+                    "Current" ->
+                        Decode.succeed Current
 
-                "Done" ->
-                    Decode.succeed Done
+                    "Done" ->
+                        Decode.succeed Done
 
-                "Icebox" ->
-                    Decode.succeed Icebox
+                    "Icebox" ->
+                        Decode.succeed Icebox
 
-                "Search" ->
-                    Decode.succeed Search
+                    "Search" ->
+                        Decode.succeed Search
 
-                "Backlog" ->
-                    Decode.succeed Backlog
+                    "Backlog" ->
+                        Decode.succeed Backlog
 
-                somethingElse ->
-                    Decode.fail <| "Unknown column type: " ++ somethingElse
-        )
+                    somethingElse ->
+                        Decode.fail <| "Unknown column type: " ++ somethingElse
+            )
+
 
 encode : Column -> Value
 encode column =

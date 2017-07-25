@@ -1,6 +1,6 @@
 module Data.PersistentData exposing (PersistentData, decoder, encode, default)
 
-import Json.Decode as Decode exposing (Decoder, field, nullable, maybe, string, dict, list, bool)
+import Json.Decode exposing (Decoder, nullable, string, dict, list, bool)
 import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional)
 import Json.Encode as Encode exposing (Value)
 import Dict exposing (Dict)
@@ -71,9 +71,10 @@ encode pd =
     ]
         |> Encode.object
 
+
 encodeDictStrings : Dict String String -> Value
-encodeDictStrings dict =
-    dict
+encodeDictStrings d =
+    d
         |> Dict.toList
-        |> List.map (\(s, v) -> (s, Encode.string v))
+        |> List.map (\( s, v ) -> ( s, Encode.string v ))
         |> Encode.object

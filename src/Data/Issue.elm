@@ -1,15 +1,17 @@
 module Data.Issue exposing (Issue, IssueState(..), decoder)
 
 import Decoders exposing (intToString, stringToDate)
-import Json.Decode as Decode exposing (Decoder, field, nullable, maybe)
-import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional)
-import Date exposing (Date)
+import Json.Decode as Decode exposing (Decoder, nullable)
+import Json.Decode.Pipeline exposing (decode, required)
+import Date
 import Data.User as User exposing (User)
 import Data.Label as Label exposing (Label)
 import Data.Milestone as Milestone exposing (Milestone)
 
 
-type IssueState = OpenIssue | ClosedIssue
+type IssueState
+    = OpenIssue
+    | ClosedIssue
 
 
 type alias Issue =
@@ -26,11 +28,13 @@ type alias Issue =
     , updatedAt : Date.Date
     }
 
+
 decoder : Decoder Issue
 decoder =
     decode Issue
         -- (field "id" decodeIntToString)
-        |> required "number" intToString
+        |>
+            required "number" intToString
         |> required "state" Decode.string
         |> required "title" Decode.string
         |> required "body" Decode.string
@@ -41,4 +45,3 @@ decoder =
         |> required "labels" (Decode.list Label.decoder)
         |> required "created_at" stringToDate
         |> required "updated_at" stringToDate
-
