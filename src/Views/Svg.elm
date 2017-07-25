@@ -3,6 +3,7 @@ module Views.Svg exposing (clipboardIcon)
 import Svg
 import Svg.Attributes
 
+
 clipboardIcon : Svg.Svg msg
 clipboardIcon =
     Svg.svg

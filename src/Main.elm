@@ -1,13 +1,13 @@
 module Main exposing (..)
 
 import Route exposing (Route, Route(..), parseHash)
-import Html exposing (Html, span, text, img, div)
+import Html exposing (Html, text, img, div)
 import Navigation exposing (programWithFlags, Location)
 import Http exposing (Error(..), Response)
-import Html.Attributes as Attrs exposing (style, class, attribute, src)
+import Html.Attributes as Attrs exposing (style, class, src)
 import Json.Decode as Decode
-import Data.Issue as Issue exposing (Issue)
-import Data.User as User exposing (User)
+import Data.Issue exposing (Issue)
+import Data.User exposing (User)
 import Request.User
 import Data.PersistentData exposing (PersistentData)
 import Json.Decode exposing (Value)
@@ -29,12 +29,14 @@ main =
         }
 
 
+
 -- MODEL
+
 
 type alias Model =
     { version : String
     , user : Maybe User
-    , repo : (String, String)
+    , repo : ( String, String )
     , token : String
     , location : Location
     , persistentData : PersistentData
@@ -65,15 +67,19 @@ init initialData location =
         repo =
             case page of
                 Just (Stories user repo) ->
-                    (user, repo)
+                    ( user, repo )
+
                 Just (Story user repo _) ->
-                    (user, repo)
+                    ( user, repo )
+
                 Just (Settings user repo) ->
-                    (user, repo)
+                    ( user, repo )
+
                 Just (Milestones user repo) ->
-                    (user, repo)
+                    ( user, repo )
+
                 _ ->
-                    ("", "")
+                    ( "", "" )
 
         persistentData =
             initialData
@@ -81,13 +87,13 @@ init initialData location =
                 |> Result.toMaybe
                 |> Maybe.withDefault Data.PersistentData.default
 
-        (repos, cmdRepos) =
+        ( repos, cmdRepos ) =
             Pages.Repos.init persistentData
 
-        (roadmap, cmdRoadmap) =
+        ( roadmap, cmdRoadmap ) =
             Pages.Roadmap.init persistentData repo
 
-        (board, cmdBoard) =
+        ( board, cmdBoard ) =
             Pages.Board.init persistentData location
 
         setup =
@@ -126,16 +132,15 @@ init initialData location =
                 -- last visited
                 List.head persistentData.recentRepos
     in
-        model !
-            [
-            if persistentData.accessToken == "" then
-                Cmd.none
-            else
-                Request.User.get persistentData.accessToken |> Http.send LoadUser
-            , Cmd.map ReposMsgProxy cmdRepos
-            , Cmd.map RoadmapMsgProxy cmdRoadmap
-            , Cmd.map BoardMsgProxy cmdBoard
-            ]
+        model
+            ! [ if persistentData.accessToken == "" then
+                    Cmd.none
+                else
+                    Request.User.get persistentData.accessToken |> Http.send LoadUser
+              , Cmd.map ReposMsgProxy cmdRepos
+              , Cmd.map RoadmapMsgProxy cmdRoadmap
+              , Cmd.map BoardMsgProxy cmdBoard
+              ]
 
 
 hasLabel : String -> Issue -> Bool
@@ -171,15 +176,14 @@ type Msg
     | LoadUser (Result Error User)
 
 
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     -- TODO: separate actions which require user
     case msg of
         SettingsMsgProxy msg ->
             let
-                upd = Pages.Settings.update msg model.persistentData
+                upd =
+                    Pages.Settings.update msg model.persistentData
             in
                 model ! [ updateLocalStorage upd ]
 
@@ -188,28 +192,27 @@ update msg model =
 
         BoardMsgProxy msg ->
             let
-                (board, cmd) =
+                ( board, cmd ) =
                     Pages.Board.update msg model.board model.persistentData
             in
                 { model | board = board } ! [ Cmd.map BoardMsgProxy cmd ]
 
         SetupMsgProxy msg ->
             let
-                (setup, cmd) =
+                ( setup, cmd ) =
                     Pages.Setup.update msg model.setup
             in
                 { model | setup = setup } ! [ Cmd.map SetupMsgProxy cmd ]
 
         RoadmapMsgProxy msg ->
             let
-                (roadmap, cmd) =
+                ( roadmap, cmd ) =
                     Pages.Roadmap.update msg model.roadmap
             in
                 { model | roadmap = roadmap } ! [ Cmd.map RoadmapMsgProxy cmd ]
 
         UrlChange location ->
             { model | location = location } ! []
-
 
         LoadUser user ->
             case user of
@@ -242,7 +245,7 @@ view model =
         , if model.persistentData.accessToken /= "" then
             viewPage model.user model <| parseHash model.location
           else
-              Html.map SetupMsgProxy Pages.Setup.view
+            Html.map SetupMsgProxy Pages.Setup.view
         ]
 
 
@@ -257,29 +260,27 @@ viewPage user model route =
                 Repos ->
                     Html.map ReposMsgProxy <| Pages.Repos.view model.repos
 
-                Story user repo id ->
+                Story _ _ _ ->
                     Html.map BoardMsgProxy <| Pages.Board.view model.board model.persistentData
 
-                Stories user repo ->
+                Stories _ _ ->
                     Html.map BoardMsgProxy <| Pages.Board.view model.board model.persistentData
 
-                Milestones user repo ->
+                Milestones _ _ ->
                     Html.map RoadmapMsgProxy <| Pages.Roadmap.view model.roadmap
 
-                Settings user repo ->
+                Settings _ _ ->
                     Html.map SettingsMsgProxy <| Pages.Settings.view model.persistentData
-
 
 
 viewNavigation : Maybe User -> Model -> Html Msg
 viewNavigation user model =
     let
-        (u, r) =
+        ( u, r ) =
             model.repo
 
         showColumns =
             model.persistentData.columns
-
 
         activePage =
             parseHash model.location
@@ -401,5 +402,3 @@ viewNavigation user model =
                     ]
             , subNav
             ]
-
-
