@@ -1,5 +1,5 @@
-module Base exposing (..)
+module Base exposing (Id)
+
 
 type alias Id =
     String
-
