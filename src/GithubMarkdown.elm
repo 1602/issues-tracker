@@ -4,13 +4,15 @@ import Html
 import Markdown exposing (toHtml)
 import Regex exposing (regex, replace, HowMany(..))
 
-ghMd : (String, String) -> String -> Html.Html msg
-ghMd (u, r) str =
+
+ghMd : ( String, String ) -> String -> Html.Html msg
+ghMd ( u, r ) str =
     str
         |> replaceLinksWithIssues
         |> replaceNamedLinksWithIssues
         |> replaceHashesWithLinks (u ++ "/" ++ r)
         |> toHtml []
+
 
 replaceHashesWithLinks : String -> String -> String
 replaceHashesWithLinks repo =
@@ -22,6 +24,7 @@ replaceHashesWithLinks repo =
             case match.submatches of
                 (Just issue) :: [] ->
                     " [#" ++ issue ++ "](#/" ++ repo ++ "/stories/" ++ issue ++ ")"
+
                 _ ->
                     match.match
     in
@@ -38,6 +41,7 @@ replaceLinksWithIssues =
             case match.submatches of
                 (Just org) :: (Just repo) :: (Just issue) :: [] ->
                     " [" ++ org ++ "/" ++ repo ++ "#" ++ issue ++ "](#/" ++ org ++ "/" ++ repo ++ "/stories/" ++ issue ++ ")"
+
                 _ ->
                     match.match
 
@@ -57,6 +61,7 @@ replaceNamedLinksWithIssues =
             case match.submatches of
                 (Just org) :: (Just repo) :: (Just issue) :: [] ->
                     "(#/" ++ org ++ "/" ++ repo ++ "/stories/" ++ issue ++ ")"
+
                 _ ->
                     match.match
 
