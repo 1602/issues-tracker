@@ -1,9 +1,10 @@
 module Pages.Settings exposing (Msg, update, view)
 
 import Data.PersistentData exposing (PersistentData)
-import Html exposing (Html, select, text, div)
+import Html exposing (Html, text, div)
 import Html.Attributes as Attrs exposing (style)
 import Html.Events exposing (onClick, onInput)
+
 
 type Msg
     = ChangeDefaultRepositoryType String
@@ -42,7 +43,7 @@ view persistentData =
             Html.option [ Attrs.selected <| value == current ] [ text value ]
 
         settingsBlock title contents =
-            div [ style [ ( "background", "#333" ), ( "border", "1px solid #555" ), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] ((Html.h3 [] [ text title ]) :: contents)
+            div [ style [ ( "background", "#333" ), ( "border", "1px solid #555" ), ( "padding", "5px" ), ( "margin-bottom", "10px" ), ( "max-width", "600px" ) ] ] (Html.h3 [] [ text title ] :: contents)
     in
         Html.main_ [ style [ ( "padding", "10px" ), ( "overflow-y", "auto" ), ( "height", "100vh" ), ( "width", "100vw" ) ] ]
             -- default repo
@@ -67,11 +68,10 @@ view persistentData =
                     ]
                 , Html.p []
                     [ text <|
-                        (if persistentData.powerOfNow then
+                        if persistentData.powerOfNow then
                             "keep this box ticked"
-                         else
+                        else
                             "tick this box"
-                        )
                     , text " if you don't want to be bothered by the things that will not happen in the nearest future"
                     ]
                 ]
@@ -80,4 +80,3 @@ view persistentData =
                 , Html.p [] [ text "this app is in active development, sometimes you need to refresh app very hard in order to have some old bugs fixed (and possibly grab some new bugs at the same time, sorry), this version number will help you to find whether your cached app version is latest (same as ", Html.a [ Attrs.href "https://github.com/1602/issues-tracker/blob/master/package.json#L4" ] [ text "here" ], text ")." ]
                 ]
             ]
-

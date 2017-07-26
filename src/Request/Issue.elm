@@ -1,13 +1,13 @@
 module Request.Issue exposing (create, list, listForMilestone, update, search)
 
-import Http exposing (Error, Response, Request)
+import Http exposing (Request)
 import Data.Issue as Issue exposing (Issue, IssueState(..))
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Decode as Decode exposing (Value)
 import Date exposing (Date)
 import Date.Extra as Date exposing (Interval(..))
 import Request.Helpers exposing (withAuthorization, repoUrl, apiUrl)
-import Request.Cache exposing (Etags, withCache, CachedResult, CachedRequest)
+import Request.Cache exposing (Etags, withCache, CachedRequest)
 import Json.Encode as Encode
 import HttpBuilder
 import Data.Column exposing (Column(..))
@@ -15,7 +15,7 @@ import Data.Filter exposing (Filter(..))
 import Util exposing ((=>))
 
 
-create : (String, String) -> String -> Value -> Request Issue
+create : ( String, String ) -> String -> Value -> Request Issue
 create repo accessToken data =
     let
         body =
@@ -32,10 +32,9 @@ create repo accessToken data =
             |> HttpBuilder.toRequest
 
 
-list : String -> Date -> String -> Filter -> (String, String) -> Column -> Etags -> CachedRequest (List Issue)
+list : String -> Date -> String -> Filter -> ( String, String ) -> Column -> Etags -> CachedRequest (List Issue)
 list doneLimit now accessToken filter repo column etags =
     let
-
         milestone =
             case column of
                 Icebox ->
@@ -47,7 +46,7 @@ list doneLimit now accessToken filter repo column etags =
                 _ ->
                     ""
 
-        (labels, state) =
+        ( labels, state ) =
             case column of
                 Backlog ->
                     "&labels=Status: Ready" => ""
@@ -60,7 +59,6 @@ list doneLimit now accessToken filter repo column etags =
 
                 _ ->
                     "" => ""
-
 
         filterByUser =
             case filter of
@@ -84,24 +82,24 @@ list doneLimit now accessToken filter repo column etags =
                 |> (++) "&since="
 
         since =
-            case (column, doneLimit) of
-                (Done, "a day") ->
+            case ( column, doneLimit ) of
+                ( Done, "a day" ) ->
                     pastMoment -1 Day
 
-                (Done, "a week") ->
+                ( Done, "a week" ) ->
                     pastMoment -1 Week
 
-                (Done, "two weeks") ->
+                ( Done, "two weeks" ) ->
                     pastMoment -2 Week
 
-                (Done, "a month") ->
+                ( Done, "a month" ) ->
                     pastMoment -1 Month
 
                 _ ->
                     ""
+
         decoder =
             Decode.list Issue.decoder
-
     in
         repoUrl repo ("/issues?sort=updated" ++ labels ++ state ++ milestone ++ filterByUser ++ since)
             |> HttpBuilder.get
@@ -110,10 +108,9 @@ list doneLimit now accessToken filter repo column etags =
             |> HttpBuilder.toRequest
 
 
-listForMilestone : String -> Date -> String -> Filter -> (String, String) -> IssueState -> Milestone -> Etags -> CachedRequest (List Issue)
+listForMilestone : String -> Date -> String -> Filter -> ( String, String ) -> IssueState -> Milestone -> Etags -> CachedRequest (List Issue)
 listForMilestone doneLimit now accessToken filter repo issueState ms etags =
     let
-
         state =
             case issueState of
                 OpenIssue ->
@@ -170,7 +167,7 @@ listForMilestone doneLimit now accessToken filter repo issueState ms etags =
 
         url =
             repoUrl repo <|
-                    "/issues?"
+                "/issues?"
                     ++ state
                     ++ "&sort=updated"
                     ++ "&milestone="
@@ -185,7 +182,7 @@ listForMilestone doneLimit now accessToken filter repo issueState ms etags =
             |> HttpBuilder.toRequest
 
 
-update : (String, String) -> String -> Encode.Value -> String -> Request Issue
+update : ( String, String ) -> String -> Encode.Value -> String -> Request Issue
 update repo issueNumber issue accessToken =
     repoUrl repo ("/issues/" ++ issueNumber)
         |> HttpBuilder.patch
@@ -195,16 +192,14 @@ update repo issueNumber issue accessToken =
         |> HttpBuilder.toRequest
 
 
-search : (String, String) -> String -> String -> Etags -> CachedRequest (List Issue)
-search (u, r) accessToken searchTerms etags =
+search : ( String, String ) -> String -> String -> Etags -> CachedRequest (List Issue)
+search ( u, r ) accessToken searchTerms etags =
     let
         decoder =
             Decode.at [ "items" ] <| Decode.list Issue.decoder
-
     in
         apiUrl ("/search/issues?" ++ "q=repo:" ++ u ++ "/" ++ r ++ " " ++ searchTerms)
             |> HttpBuilder.get
             |> withAuthorization accessToken
             |> withCache etags decoder
             |> HttpBuilder.toRequest
-

@@ -3,7 +3,7 @@ module Request.Cache exposing (withCache, Etags, RemoteData(..), updateCache, re
 import Http exposing (Error(..))
 import HttpBuilder exposing (withHeader, RequestBuilder)
 import Dict exposing (Dict)
-import Json.Decode as Decode exposing (Decoder, decodeString)
+import Json.Decode exposing (Decoder, decodeString)
 
 
 type alias Etags =
@@ -18,8 +18,10 @@ type RemoteData a
 type alias CachedRequest a =
     Http.Request (RemoteData a)
 
+
 type alias CachedResult a =
     Result Error (RemoteData a)
+
 
 withCache : Etags -> Decoder a -> RequestBuilder () -> RequestBuilder (RemoteData a)
 withCache etags decoder rb =
@@ -29,7 +31,7 @@ withCache etags decoder rb =
                 |> Dict.toList
                 |> List.filterMap
                     (\( key, val ) ->
-                        if "etag" == (String.toLower key) then
+                        if "etag" == String.toLower key then
                             Just val
                         else
                             Nothing
@@ -40,13 +42,17 @@ withCache etags decoder rb =
             case Dict.get rb.url etags of
                 Just etag ->
                     ( "If-None-Match", etag )
+
                 Nothing ->
                     ( "If-Modified-Since", "0" )
 
         decode str fn =
             case decodeString decoder str of
-                Ok x -> Ok (fn x)
-                Err y -> Err y
+                Ok x ->
+                    Ok (fn x)
+
+                Err y ->
+                    Err y
 
         expect =
             Http.expectStringResponse
@@ -65,7 +71,7 @@ withCache etags decoder rb =
 
 
 updateCache : Result Error (RemoteData a) -> Etags -> Etags
-updateCache result cache = 
+updateCache result cache =
     case result of
         Ok (CanBeCached url etag _) ->
             Dict.insert url etag cache
@@ -95,5 +101,6 @@ retrieveData result prevData =
     case result of
         Ok (CanBeCached _ _ data) ->
             data
+
         _ ->
             prevData

@@ -6,7 +6,7 @@ import Base64
 
 -- import Task
 
-import Http exposing (Error, Response)
+import Http
 
 
 apiUrl : String -> String
@@ -14,9 +14,10 @@ apiUrl path =
     "https://api.github.com" ++ path
 
 
-repoUrl : (String, String) -> String -> String
-repoUrl (u, r) path =
+repoUrl : ( String, String ) -> String -> String
+repoUrl ( u, r ) path =
     "https://api.github.com/repos/" ++ u ++ "/" ++ r ++ path
+
 
 authHeader : String -> Http.Header
 authHeader secretKey =
