@@ -147,34 +147,34 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     -- TODO: separate actions which require user
     case msg of
-        SettingsMsgProxy msg ->
+        SettingsMsgProxy m ->
             let
                 upd =
-                    Pages.Settings.update msg model.persistentData
+                    Pages.Settings.update m model.persistentData
             in
                 model ! [ updateLocalStorage upd ]
 
-        ReposMsgProxy msg ->
-            { model | repos = Pages.Repos.update msg model.repos } ! []
+        ReposMsgProxy m ->
+            { model | repos = Pages.Repos.update m model.repos } ! []
 
-        BoardMsgProxy msg ->
+        BoardMsgProxy m ->
             let
                 ( board, cmd ) =
-                    Pages.Board.update msg model.board model.persistentData
+                    Pages.Board.update m model.board model.persistentData
             in
                 { model | board = board } ! [ Cmd.map BoardMsgProxy cmd ]
 
-        SetupMsgProxy msg ->
+        SetupMsgProxy m ->
             let
                 ( setup, cmd ) =
-                    Pages.Setup.update msg model.setup
+                    Pages.Setup.update m model.setup
             in
                 { model | setup = setup } ! [ Cmd.map SetupMsgProxy cmd ]
 
-        RoadmapMsgProxy msg ->
+        RoadmapMsgProxy m ->
             let
                 ( roadmap, cmd ) =
-                    Pages.Roadmap.update msg model.roadmap
+                    Pages.Roadmap.update m model.roadmap
             in
                 { model | roadmap = roadmap } ! [ Cmd.map RoadmapMsgProxy cmd ]
 
