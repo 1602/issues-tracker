@@ -13,12 +13,13 @@ ghMd ( u, r ) str =
         |> replaceHashesWithLinks (u ++ "/" ++ r)
         |> toHtml []
 
+hashWithNumber : Regex
+hashWithNumber =
+    regex "\\s#(\\d+)"
 
 replaceHashesWithLinks : String -> String -> String
 replaceHashesWithLinks repo =
     let
-        expr =
-            regex "\\s#(\\d+)"
 
         replaceHashWithLink match =
             case match.submatches of
@@ -30,8 +31,12 @@ replaceHashesWithLinks repo =
     in
         replace
             All
-            expr
+            hashWithNumber
             replaceHashWithLink
+
+linkToIssue : Regex
+linkToIssue =
+    regex "\\shttps:\\/\\/github.com\\/(.+?)\\/(.+?)\\/issues\\/(\\d+)"
 
 
 replaceLinksWithIssues : String -> String
@@ -45,14 +50,16 @@ replaceLinksWithIssues =
                 _ ->
                     match.match
 
-        expr =
-            regex "\\shttps:\\/\\/github.com\\/(.+?)\\/(.+?)\\/issues\\/(\\d+)"
     in
         replace
             All
-            expr
+            linkToIssue
             replaceLinkWithIssue
 
+
+namedLinkToIssue : Regex
+namedLinkToIssue =
+    regex "\\(\\s*https:\\/\\/github.com\\/(.+?)\\/(.+?)\\/issues\\/(\\d+)\\s*\\)"
 
 replaceNamedLinksWithIssues : String -> String
 replaceNamedLinksWithIssues =
@@ -65,10 +72,8 @@ replaceNamedLinksWithIssues =
                 _ ->
                     match.match
 
-        expr =
-            regex "\\(\\s*https:\\/\\/github.com\\/(.+?)\\/(.+?)\\/issues\\/(\\d+)\\s*\\)"
     in
         replace
             All
-            expr
+            namedLinkToIssue
             replaceNamedLinkWithIssue
