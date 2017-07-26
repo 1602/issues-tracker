@@ -3,18 +3,17 @@ module Pages.Board exposing (Model, Msg, init, update, view, subscriptions, issu
 import Route exposing (Route(..), parseHash)
 import Dict
 import Html exposing (Html, span, text, img, div)
-import Navigation exposing (programWithFlags, Location)
-import Http exposing (Error(..), Response)
+import Navigation exposing (Location)
+import Http exposing (Error(NetworkError))
 import Date
 import Time
 import Task
 import Date.Distance as Distance
-import Html.Attributes as Attrs exposing (style, class, attribute, src)
+import Html.Attributes as Attrs exposing (style, class, src)
 import Html.Events exposing (onClick, onInput)
 import Json.Encode as Encode
 import Dom
 import Date.Extra
-import Json.Decode as Decode
 import GithubMarkdown exposing (ghMd)
 import Data.Issue as Issue exposing (Issue, IssueState(..))
 import Data.Filter as Filter exposing (Filter(..))
@@ -25,7 +24,7 @@ import Request.User
 import Request.Milestone
 import Data.PersistentData exposing (PersistentData)
 import Data.Column exposing (Column(..))
-import Json.Decode exposing (Value)
+import Json.Decode as Decode exposing (Value)
 import Ports exposing (saveData)
 import Request.Cache exposing (Etags, CachedRequest, CachedResult, retrieveError, retrieveData, updateCache)
 
@@ -277,7 +276,6 @@ type Msg
     | ReopenColumn Column
     | PinMilestone String
     | FilterStories String
-    | NavigateToIssue ( String, String )
     | SearchIssues
     | ChangeSearchTerms String
     | IssuesSearchResults (CachedResult (List Issue))
@@ -374,12 +372,9 @@ update msg model pd =
                         |> Http.send IssuesSearchResults
                   ]
 
-        NavigateToIssue ( repo, issueNumber ) ->
-            model
-                ! [ Navigation.modifyUrl <| "#/" ++ repo ++ "/stories/" ++ issueNumber ]
-
         FilterStories s ->
             { model | filterStoriesBy = s } ! []
+
 
         PinMilestone s ->
             let
