@@ -1,6 +1,6 @@
 module Pages.Board exposing (Model, Msg, init, update, view, subscriptions, issuesSubnav)
 
-import Route exposing (Route, Route(..), parseHash)
+import Route exposing (Route(..), parseHash)
 import Dict
 import Html exposing (Html, span, text, img, div)
 import Navigation exposing (programWithFlags, Location)
@@ -29,10 +29,12 @@ import Json.Decode exposing (Value)
 import Ports exposing (saveData)
 import Request.Cache exposing (Etags, CachedRequest, CachedResult, retrieveError, retrieveData, updateCache)
 
+
 -- MODEL
 
+
 type alias Model =
-    { repo : (String, String)
+    { repo : ( String, String )
     , token : String
     , location : Location
     , now : Date.Date
@@ -40,7 +42,7 @@ type alias Model =
     , currentIssues : Maybe (List Issue)
     , iceboxIssues : Maybe (List Issue)
     , closedIssues : Maybe (List Issue)
-    , milestones : Dict.Dict (String, String) (Dict.Dict String ExpandedMilestone)
+    , milestones : Dict.Dict ( String, String ) (Dict.Dict String ExpandedMilestone)
     , pickMilestoneForIssue : Maybe Issue
     , lockedIssueNumber : String
     , highlightStory : String
@@ -65,6 +67,7 @@ type alias ExpandedMilestone =
     , closedIssues : Maybe (List Issue)
     }
 
+
 init : PersistentData -> Location -> ( Model, Cmd Msg )
 init pd location =
     let
@@ -85,15 +88,19 @@ init pd location =
         repo =
             case page of
                 Just (Stories user repo) ->
-                    (user, repo)
+                    ( user, repo )
+
                 Just (Story user repo _) ->
-                    (user, repo)
+                    ( user, repo )
+
                 Just (Settings user repo) ->
-                    (user, repo)
+                    ( user, repo )
+
                 Just (Milestones user repo) ->
-                    (user, repo)
+                    ( user, repo )
+
                 _ ->
-                    ("", "")
+                    ( "", "" )
 
         model =
             Model
@@ -145,7 +152,6 @@ init pd location =
                 True
                 -- listMilestones
                 []
-
     in
         model
             ! ([ Task.perform CurrentDate Date.now
@@ -167,6 +173,7 @@ listForMilestone model pd issueState ms =
         model.etags
         |> Http.send (MilestoneIssuesLoaded ms.number issueState)
 
+
 requestIssueList : Model -> PersistentData -> Column -> Cmd Msg
 requestIssueList model persistentData column =
     Request.Issue.list
@@ -178,6 +185,7 @@ requestIssueList model persistentData column =
         column
         model.etags
         |> Http.send (IssuesLoaded column)
+
 
 hasLabel : String -> Issue -> Bool
 hasLabel label issue =
@@ -225,7 +233,6 @@ loadResource model pd =
             loadAllIssues model pd
 
 
-
 updateLocalStorage : PersistentData -> Cmd msg
 updateLocalStorage persistentData =
     persistentData
@@ -235,6 +242,7 @@ updateLocalStorage persistentData =
 
 
 -- UPDATE
+
 
 type Msg
     = NoOp
@@ -269,7 +277,7 @@ type Msg
     | ReopenColumn Column
     | PinMilestone String
     | FilterStories String
-    | NavigateToIssue (String, String)
+    | NavigateToIssue ( String, String )
     | SearchIssues
     | ChangeSearchTerms String
     | IssuesSearchResults (CachedResult (List Issue))
@@ -314,7 +322,6 @@ focus loc =
             Cmd.none
 
 
-
 update : Msg -> Model -> PersistentData -> ( Model, Cmd Msg )
 update msg model pd =
     -- TODO: separate actions which require user
@@ -337,7 +344,6 @@ update msg model pd =
 
                 updatedPersistentData =
                     { pd | savedSearches = updatedSavedSearches }
-
             in
                 model ! [ updateLocalStorage updatedPersistentData ]
 
@@ -346,7 +352,8 @@ update msg model pd =
                 | searchResults = retrieveData result model.searchResults
                 , error = retrieveError result
                 , etags = updateCache result model.etags
-                } ! []
+            }
+                ! []
 
         ChangeSearchTerms terms ->
             { model | searchTerms = terms } ! []
@@ -356,28 +363,27 @@ update msg model pd =
                 updatedModel =
                     { model | searchTerms = s }
             in
-                updatedModel !
-                    [ Request.Issue.search model.repo pd.accessToken model.searchTerms model.etags
-                        |> Http.send IssuesSearchResults
-                    ]
+                updatedModel
+                    ! [ Request.Issue.search model.repo pd.accessToken model.searchTerms model.etags
+                            |> Http.send IssuesSearchResults
+                      ]
 
         SearchIssues ->
-            model !
-                [ Request.Issue.search model.repo pd.accessToken model.searchTerms model.etags
-                    |> Http.send IssuesSearchResults
-                ]
+            model
+                ! [ Request.Issue.search model.repo pd.accessToken model.searchTerms model.etags
+                        |> Http.send IssuesSearchResults
+                  ]
 
         NavigateToIssue ( repo, issueNumber ) ->
             model
                 ! [ Navigation.modifyUrl <| "#/" ++ repo ++ "/stories/" ++ issueNumber ]
-
 
         FilterStories s ->
             { model | filterStoriesBy = s } ! []
 
         PinMilestone s ->
             let
-                (u, r) =
+                ( u, r ) =
                     model.repo
 
                 thisRepo =
@@ -394,14 +400,12 @@ update msg model pd =
                     else
                         s
 
-
                 updatedPersistentData =
                     { pd
                         | pinnedMilestones =
                             pd.pinnedMilestones
                                 |> Dict.insert thisRepo n
                     }
-
             in
                 model
                     ! (if n /= "" then
@@ -412,14 +416,12 @@ update msg model pd =
 
         HideColumn s ->
             let
-
                 updatedPersistentData =
                     { pd
                         | columns =
                             pd.columns
                                 |> List.filter ((/=) s)
                     }
-
             in
                 model ! [ updateLocalStorage updatedPersistentData ]
 
@@ -432,7 +434,6 @@ update msg model pd =
                                 |> List.filter ((/=) s)
                                 |> (::) s
                     }
-
             in
                 model ! [ updateLocalStorage updatedPersistentData ]
 
@@ -554,7 +555,8 @@ update msg model pd =
                         updatedModel =
                             { model | error = Nothing }
 
-                        upd = { pd | user = user }
+                        upd =
+                            { pd | user = user }
                     in
                         updatedModel ! (loadResource updatedModel pd)
 
@@ -564,15 +566,14 @@ update msg model pd =
                             { model | error = Just (toString e) } ! []
 
                         _ ->
-                            { model | error = Just (toString e) } ! [
-                                updateLocalStorage { pd | accessToken = "" , user = Nothing }
-                            ]
+                            { model | error = Just (toString e) }
+                                ! [ updateLocalStorage { pd | accessToken = "", user = Nothing }
+                                  ]
 
         SaveAccessToken ->
             let
                 upd =
                     { pd | accessToken = model.token }
-
             in
                 if model.token == "" then
                     model ! [ Navigation.load "https://github.com/settings/tokens" ]
@@ -584,36 +585,39 @@ update msg model pd =
 
         CurrentTime now ->
             let
-                page = parseHash model.location
+                page =
+                    parseHash model.location
             in
-                { model | now = Date.fromTime now } !
-                (case page of
-                    Just (Stories _ _) ->
-                        loadAllIssues model pd
-                    Just (Story _ _ _) ->
-                        loadAllIssues model pd
-                    _ ->
-                        []
-                )
+                { model | now = Date.fromTime now }
+                    ! (case page of
+                        Just (Stories _ _) ->
+                            loadAllIssues model pd
+
+                        Just (Story _ _ _) ->
+                            loadAllIssues model pd
+
+                        _ ->
+                            []
+                      )
 
         UrlChange location ->
             let
-                (highlightStory, u, r) =
+                ( highlightStory, u, r ) =
                     case parseHash location of
                         Just (Story u r s) ->
-                            (s, u, r)
+                            ( s, u, r )
 
                         Just (Stories u r) ->
-                            ("", u, r)
+                            ( "", u, r )
 
                         Just (Settings u r) ->
-                            ("", u, r)
+                            ( "", u, r )
 
                         _ ->
-                            ("", "", "")
+                            ( "", "", "" )
 
                 newRepository =
-                    (u, r)
+                    ( u, r )
 
                 newRepo =
                     u ++ "/" ++ r
@@ -628,7 +632,6 @@ update msg model pd =
                                 |> List.take 19
                            )
 
-
                 needFocus =
                     (highlightStory /= "") && (highlightStory /= model.highlightStory)
 
@@ -638,7 +641,8 @@ update msg model pd =
                     else
                         prependNewRepositoryToRecent
 
-                persistentData = { pd | recentRepos = recentRepos }
+                persistentData =
+                    { pd | recentRepos = recentRepos }
 
                 updatedModel =
                     { model
@@ -775,7 +779,7 @@ update msg model pd =
 
         LoadMilestones result ->
             let
-                (u, r) =
+                ( u, r ) =
                     model.repo
 
                 thisRepo =
@@ -823,7 +827,8 @@ update msg model pd =
                             )
                             (Dict.get model.repo model.milestones |> Maybe.withDefault Dict.empty)
 
-                persistentData = { pd | recentRepos = recentRepos }
+                persistentData =
+                    { pd | recentRepos = recentRepos }
 
                 updatedModel =
                     { model
@@ -840,7 +845,7 @@ update msg model pd =
                                     |> List.map .milestone
                                     |> List.filter (\ms -> ms.openIssues > 0)
                                     |> List.map (\ms -> listForMilestone model pd OpenIssue ms)
-                                            -- Request.Issue.listForMilestone model OpenIssue ms |> Http.send (MilestoneIssuesLoaded ms.number OpenIssue)
+                                -- Request.Issue.listForMilestone model OpenIssue ms |> Http.send (MilestoneIssuesLoaded ms.number OpenIssue)
                                )
                             ++ (updatedMilestones
                                     |> Dict.values
@@ -857,7 +862,8 @@ update msg model pd =
                 Ok _ ->
                     let
                         -- TODO get rid of hack by applying powerOfNow setting on a view level (and separating list on issues with the list of milestones)
-                        persistentData = { pd | powerOfNow = False }
+                        persistentData =
+                            { pd | powerOfNow = False }
                     in
                         { model
                             | error =
@@ -872,45 +878,45 @@ update msg model pd =
 
         IssuesLoaded column result ->
             let
-                error = retrieveError result
+                error =
+                    retrieveError result
             in
-            case column of
-                Current ->
-                    { model
-                        | currentIssues = retrieveData result (Maybe.withDefault [] model.currentIssues) |> Just
-                        , error = error
+                case column of
+                    Current ->
+                        { model
+                            | currentIssues = retrieveData result (Maybe.withDefault [] model.currentIssues) |> Just
+                            , error = error
                         }
-                        ! (if model.needFocus then
-                            [ focus model.location ]
-                           else
-                            []
-                          )
+                            ! (if model.needFocus then
+                                [ focus model.location ]
+                               else
+                                []
+                              )
 
-                Icebox ->
-                    { model
-                        | iceboxIssues = retrieveData result (Maybe.withDefault [] model.iceboxIssues) |> Just
-                        , error = error
+                    Icebox ->
+                        { model
+                            | iceboxIssues = retrieveData result (Maybe.withDefault [] model.iceboxIssues) |> Just
+                            , error = error
                         }
+                            ! (if model.needFocus then
+                                [ focus model.location ]
+                               else
+                                []
+                              )
 
-                        ! (if model.needFocus then
-                            [ focus model.location ]
-                           else
-                            []
-                          )
-
-                Done ->
-                    { model
-                        | closedIssues = retrieveData result (Maybe.withDefault [] model.closedIssues) |> Just
-                        , error = error
+                    Done ->
+                        { model
+                            | closedIssues = retrieveData result (Maybe.withDefault [] model.closedIssues) |> Just
+                            , error = error
                         }
-                        ! (if model.needFocus then
-                            [ focus model.location ]
-                           else
-                            []
-                          )
+                            ! (if model.needFocus then
+                                [ focus model.location ]
+                               else
+                                []
+                              )
 
-                _ ->
-                    model ! []
+                    _ ->
+                        model ! []
 
         CopyText str ->
             model ! [ Ports.clipboard str ]
@@ -1276,7 +1282,6 @@ view model persistentData =
                     |> append groups.week "Updated within a week" False
                     |> append groups.earlier "Updated more than a week ago" False
 
-
         column col colHtml content =
             let
                 ( icon, title, comment ) =
@@ -1357,9 +1362,9 @@ view model persistentData =
                         Html.form [ class "search-issue", style [ ( "display", "inline-block" ), ( "width", "calc(100% - 128px)" ) ], Html.Events.onSubmit SearchIssues ]
                             [ Html.input [ class "search-term", Attrs.value model.searchTerms, Html.Events.onInput ChangeSearchTerms ] []
                             , if List.length model.searchResults > 0 then
-                                    Html.span [ class "clear-search", onClick ClearSearch ] [ text "×" ]
-                                else
-                                    text ""
+                                Html.span [ class "clear-search", onClick ClearSearch ] [ text "×" ]
+                              else
+                                text ""
                             , if model.searchTerms /= "" then
                                 if List.length model.searchResults > 0 then
                                     Html.span
@@ -1372,15 +1377,14 @@ view model persistentData =
                                         , onClick ToggleSaveSearch
                                         ]
                                         [ text "⭐" ]
-
-                                  else
-                                        text ""
+                                else
+                                    text ""
                               else
                                 text ""
                             ]
                     )
                     (Just <|
-                        if  List.length model.searchResults == 0 then
+                        if List.length model.searchResults == 0 then
                             div []
                                 [ Html.a
                                     [ cellStyle "calc(100% - 10px)"
@@ -1397,10 +1401,9 @@ view model persistentData =
                                             )
                                     )
                                 ]
-
                         else
                             displayIssuesGroupedByDate
-                            model.searchResults
+                                model.searchResults
                                 Icebox
                                 |> div []
                     )
@@ -1591,7 +1594,7 @@ listIssues ( icon, head ) allowAdd issues col model addto milestoneNumber =
                 Nothing ->
                     Nothing
 
-        (user, repo) =
+        ( user, repo ) =
             model.repo
     in
         issues
@@ -1840,6 +1843,7 @@ textareaStyle =
         , ( "color", "#0F0" )
         ]
 
+
 issuesSubnav : PersistentData -> Html.Html Msg
 issuesSubnav pd =
     let
@@ -1854,13 +1858,12 @@ issuesSubnav pd =
             |> reopeningColumnButton Search showColumns
             |> div []
 
+
 viewNavigation : Maybe User -> Model -> PersistentData -> Html Msg
 viewNavigation user model persistentData =
     let
-        (u, r) =
+        ( u, r ) =
             model.repo
-
-
 
         activePage =
             parseHash model.location
@@ -1978,11 +1981,10 @@ viewNavigation user model persistentData =
             ]
 
 
-
 listIssuesWithinMilestones : PersistentData -> Dict.Dict String ExpandedMilestone -> IssueState -> Date.Date -> Model -> Html Msg
 listIssuesWithinMilestones persistentData milestones issueState now model =
     let
-        (u, r) =
+        ( u, r ) =
             model.repo
 
         pinnedMilestoneNumber =
@@ -2089,6 +2091,7 @@ listIssuesWithinMilestones persistentData milestones issueState now model =
             |> List.sortBy milestoneSortingRule
             |> List.map renderMilestoneWithIssues
             |> div []
+
 
 reopeningColumnButton : Column -> List Column -> List (Html Msg) -> List (Html Msg)
 reopeningColumnButton col showColumns list =
