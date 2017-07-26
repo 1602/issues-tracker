@@ -8,7 +8,7 @@ import Html.Attributes as Attrs exposing (style, src)
 import Data.User exposing (User)
 import Request.User
 import Data.PersistentData exposing (PersistentData)
-import Json.Decode exposing (Value, decodeValue, decodeValue)
+import Json.Decode exposing (Value, decodeValue)
 import Ports exposing (saveData)
 import Pages.Repos
 import Pages.Roadmap
@@ -108,7 +108,6 @@ init initialData location =
                 board
                 -- setup
                 setup
-
     in
         model
             ! [ if persistentData.accessToken == "" then
@@ -119,7 +118,6 @@ init initialData location =
               , Cmd.map RoadmapMsgProxy cmdRoadmap
               , Cmd.map BoardMsgProxy cmdBoard
               ]
-
 
 
 updateLocalStorage : PersistentData -> Cmd msg
@@ -183,8 +181,8 @@ update msg model =
 
         LoadUser user ->
             case user of
-                Ok user ->
-                    { model | user = Just user } ! []
+                Ok u ->
+                    { model | user = Just u } ! []
 
                 Err _ ->
                     model ! []
@@ -245,9 +243,6 @@ viewNavigation user model =
     let
         ( u, r ) =
             model.repo
-
-        showColumns =
-            model.persistentData.columns
 
         activePage =
             parseHash model.location
@@ -336,7 +331,7 @@ viewNavigation user model =
                     Nothing ->
                         text ""
 
-                    Just user ->
+                    Just { avatar } ->
                         Html.li [ menuListItemStyle isSettingsActive ]
                             [ Html.a
                                 [ Route.href <| Settings u r
@@ -346,7 +341,7 @@ viewNavigation user model =
                                     ]
                                 ]
                                 [ img
-                                    [ src user.avatar
+                                    [ src avatar
                                     , Attrs.width 24
                                     , style [ ( "vertical-align", "middle" ) ]
                                     ]
