@@ -210,14 +210,14 @@ view model =
     div [ style [ ( "display", "flex" ) ] ] <|
         [ viewNavigation model.user model
         , if model.persistentData.accessToken /= "" then
-            viewPage model.user model <| parseHash model.location
+            viewPage model <| parseHash model.location
           else
             Html.map SetupMsgProxy Pages.Setup.view
         ]
 
 
-viewPage : Maybe User -> Model -> Maybe Route -> Html Msg
-viewPage user model route =
+viewPage : Model -> Maybe Route -> Html Msg
+viewPage model route =
     case route of
         Nothing ->
             Html.map ReposMsgProxy <| Pages.Repos.view model.repos
