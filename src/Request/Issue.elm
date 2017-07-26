@@ -2,7 +2,7 @@ module Request.Issue exposing (create, list, listForMilestone, update, search)
 
 import Http exposing (Request)
 import Data.Issue as Issue exposing (Issue, IssueState(..))
-import Data.Milestone as Milestone exposing (Milestone)
+import Data.Milestone exposing (Milestone)
 import Json.Decode as Decode exposing (Value)
 import Date exposing (Date)
 import Date.Extra as Date exposing (Interval(Day, Week, Month, Hour))

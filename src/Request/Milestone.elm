@@ -1,6 +1,6 @@
 module Request.Milestone exposing (create, list)
 
-import Http exposing (Response, Request)
+import Http exposing (Request)
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Encode as Encode
 import Json.Decode as Decode

@@ -5,7 +5,7 @@ import Dict
 import Html exposing (Html, span, text, img, div)
 import Navigation exposing (programWithFlags, Location)
 import Http exposing (Error(..), Response)
-import Date exposing (Date)
+import Date
 import Time
 import Task
 import Date.Distance as Distance
@@ -2118,7 +2118,7 @@ reopeningColumnButton col showColumns list =
             )
                 :: list
         else
-            (Html.button
+            Html.button
                 [ style
                     (buttonStyle
                         |> List.filter
@@ -2139,5 +2139,4 @@ reopeningColumnButton col showColumns list =
                 , onClick <| ReopenColumn col
                 ]
                 [ text <| icon ]
-            )
                 :: list

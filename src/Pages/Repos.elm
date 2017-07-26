@@ -1,7 +1,7 @@
 module Pages.Repos exposing (Msg, Model, view, init, update)
 
 import Http exposing (Error)
-import Html exposing (div, text, ul, li, text)
+import Html exposing (div, text, ul, li)
 import Html.Attributes exposing (href)
 import Data.Repo exposing (Repo)
 import Request.Repo
