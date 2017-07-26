@@ -1,7 +1,6 @@
 module Request.User exposing (get)
 
-import Base64
-import Http exposing (Error, Response)
+import Http
 import Dict
 import Data.User as User exposing (User)
 import Json.Decode as Decode
@@ -38,12 +37,3 @@ get accessToken =
             |> withAuthorization accessToken
             |> withHeader "if-modified-since" "0"
             |> HttpBuilder.toRequest
-
-
-buildAuthHeader : String -> String
-buildAuthHeader secretKey =
-    secretKey
-        ++ ":"
-        |> Base64.encode
-        |> Result.withDefault ""
-        |> (++) "Basic "

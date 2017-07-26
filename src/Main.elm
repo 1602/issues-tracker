@@ -1,16 +1,14 @@
-module Main exposing (..)
+module Main exposing (main)
 
-import Route exposing (Route, Route(..), parseHash)
+import Route exposing (Route(..), parseHash)
 import Html exposing (Html, text, img, div)
 import Navigation exposing (programWithFlags, Location)
-import Http exposing (Error(..))
+import Http exposing (Error)
 import Html.Attributes as Attrs exposing (style, src)
-import Json.Decode as Decode
-import Data.Issue exposing (Issue)
 import Data.User exposing (User)
 import Request.User
 import Data.PersistentData exposing (PersistentData)
-import Json.Decode exposing (Value)
+import Json.Decode exposing (Value, decodeValue, decodeValue)
 import Ports exposing (saveData)
 import Pages.Repos
 import Pages.Roadmap
@@ -53,37 +51,26 @@ init initialData location =
         page =
             parseHash location
 
-        needFocus =
-            highlightStory /= ""
-
-        highlightStory =
-            case page of
-                Just (Story _ _ s) ->
-                    s
-
-                _ ->
-                    ""
-
         repo =
             case page of
-                Just (Stories user repo) ->
-                    ( user, repo )
+                Just (Stories u r) ->
+                    ( u, r )
 
-                Just (Story user repo _) ->
-                    ( user, repo )
+                Just (Story u r _) ->
+                    ( u, r )
 
-                Just (Settings user repo) ->
-                    ( user, repo )
+                Just (Settings u r) ->
+                    ( u, r )
 
-                Just (Milestones user repo) ->
-                    ( user, repo )
+                Just (Milestones u r) ->
+                    ( u, r )
 
                 _ ->
                     ( "", "" )
 
         persistentData =
             initialData
-                |> Decode.decodeValue Data.PersistentData.decoder
+                |> decodeValue Data.PersistentData.decoder
                 |> Result.toMaybe
                 |> Maybe.withDefault Data.PersistentData.default
 
@@ -122,15 +109,6 @@ init initialData location =
                 -- setup
                 setup
 
-        defaultRepo =
-            if persistentData.defaultRepositoryType == "specified" then
-                if persistentData.defaultRepository == "" then
-                    Nothing
-                else
-                    Just persistentData.defaultRepository
-            else
-                -- last visited
-                List.head persistentData.recentRepos
     in
         model
             ! [ if persistentData.accessToken == "" then
@@ -142,17 +120,6 @@ init initialData location =
               , Cmd.map BoardMsgProxy cmdBoard
               ]
 
-
-hasLabel : String -> Issue -> Bool
-hasLabel label issue =
-    issue.labels
-        |> List.map .name
-        |> List.member label
-
-
-hasNoLabel : String -> Issue -> Bool
-hasNoLabel label issue =
-    not <| hasLabel label issue
 
 
 updateLocalStorage : PersistentData -> Cmd msg
@@ -326,7 +293,7 @@ viewNavigation user model =
                   -- , ( "height", "30px" )
                 ]
 
-        viewLink src childNode location =
+        viewLink name childNode location =
             let
                 repo =
                     location.hash
@@ -340,10 +307,10 @@ viewNavigation user model =
                         |> String.split "/"
                         |> List.drop 3
                         |> String.join "/"
-                        |> String.startsWith src
+                        |> String.startsWith name
 
                 url =
-                    "#/" ++ repo ++ "/" ++ src
+                    "#/" ++ repo ++ "/" ++ name
 
                 link =
                     if isActive then

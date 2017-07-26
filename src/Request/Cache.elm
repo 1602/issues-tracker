@@ -1,6 +1,6 @@
-module Request.Cache exposing (withCache, Etags, RemoteData(..), updateCache, retrieveError, retrieveData, CachedRequest, CachedResult)
+module Request.Cache exposing (withCache, Etags, RemoteData, updateCache, retrieveError, retrieveData, CachedRequest, CachedResult)
 
-import Http exposing (Error(..))
+import Http exposing (Error(BadStatus))
 import HttpBuilder exposing (withHeader, RequestBuilder)
 import Dict exposing (Dict)
 import Json.Decode exposing (Decoder, decodeString)

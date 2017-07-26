@@ -1,7 +1,8 @@
 module Route exposing (Route, Route(..), parseHash, href)
 
 -- import Base exposing (..)
-import UrlParser exposing (Parser, (</>), s, int, string, map, oneOf)
+
+import UrlParser exposing (Parser, (</>), s, string, map, oneOf)
 import Navigation exposing (Location)
 import Html.Attributes as Attr
 import Html exposing (Attribute)
@@ -23,11 +24,12 @@ route =
     in
         oneOf
             [ map Stories <| repo </> s "stories"
-            , map Milestones <| repo </> s  "milestones"
+            , map Milestones <| repo </> s "milestones"
             , map Story <| repo </> s "stories" </> string
-            , map Settings <| repo </> s  "settings"
+            , map Settings <| repo </> s "settings"
             , map Repos <| s ""
             ]
+
 
 parseHash : Location -> Maybe Route
 parseHash loc =
@@ -37,7 +39,7 @@ parseHash loc =
 routeToString : Route -> String
 routeToString page =
     case page of
-        Repos -> 
+        Repos ->
             "#/"
 
         Milestones user repo ->
@@ -56,4 +58,3 @@ routeToString page =
 href : Route -> Attribute msg
 href route =
     Attr.href (routeToString route)
-

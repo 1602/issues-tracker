@@ -5,13 +5,13 @@ import Data.Issue as Issue exposing (Issue, IssueState(..))
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Decode as Decode exposing (Value)
 import Date exposing (Date)
-import Date.Extra as Date exposing (Interval(..))
+import Date.Extra as Date exposing (Interval(Day, Week, Month, Hour))
 import Request.Helpers exposing (withAuthorization, repoUrl, apiUrl)
 import Request.Cache exposing (Etags, withCache, CachedRequest)
 import Json.Encode as Encode
 import HttpBuilder
-import Data.Column exposing (Column(..))
-import Data.Filter exposing (Filter(..))
+import Data.Column exposing (Column(Icebox, Backlog, Current, Done))
+import Data.Filter exposing (Filter(All, HasMentionOf, AssignedTo, CreatedBy))
 import Util exposing ((=>))
 
 

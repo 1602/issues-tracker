@@ -1,8 +1,8 @@
 module SSCCE exposing (main)
 
-import Html exposing (program, Html, span, text, img, div, li, ul)
+import Html exposing (program, Html, text, li, ul)
 import Html.Attributes exposing (href)
-import Http exposing (Error(..), Response)
+import Http exposing (Error)
 import Data.Repo exposing (Repo)
 import Request.Repo
 import Time exposing (Time)
@@ -74,14 +74,14 @@ view model =
                         [ href <| "#/" ++ x.fullName ++ "/stories" ]
                         [ text x.fullName
                         ]
-                    , text <| " (" ++ (toString x.openIssuesCount) ++ " open issues)"
+                    , text <| " (" ++ toString x.openIssuesCount ++ " open issues)"
                     ]
             )
         |> ul []
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.batch
         [ Time.every (1 * Time.second) Poll
         ]

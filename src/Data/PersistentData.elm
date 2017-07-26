@@ -4,7 +4,7 @@ import Json.Decode exposing (Decoder, nullable, string, dict, list, bool)
 import Json.Decode.Pipeline exposing (decode, optional)
 import Json.Encode as Encode exposing (Value)
 import Dict exposing (Dict)
-import Data.Column exposing (Column(..))
+import Data.Column exposing (Column(Icebox, Backlog, Current, Done))
 import Data.User exposing (User)
 import Util exposing ((=>))
 

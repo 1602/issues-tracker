@@ -1,4 +1,4 @@
-module Data.Filter exposing (Filter(..))
+module Data.Filter exposing (Filter(All, CreatedBy, AssignedTo, HasMentionOf))
 
 
 type Filter

@@ -1,4 +1,4 @@
-module Decoders exposing (..)
+module Decoders exposing (intToDate, intToString, stringToDate)
 
 import Json.Decode as Decode
 import Date
@@ -13,6 +13,15 @@ intToDate =
             )
 
 
+intToString : Decode.Decoder String
+intToString =
+    Decode.int
+        |> Decode.andThen
+            (\val ->
+                Decode.succeed <| toString val
+            )
+
+
 stringToDate : Decode.Decoder Date.Date
 stringToDate =
     Decode.string
@@ -24,13 +33,4 @@ stringToDate =
 
                     Ok date ->
                         Decode.succeed date
-            )
-
-
-intToString : Decode.Decoder String
-intToString =
-    Decode.int
-        |> Decode.andThen
-            (\val ->
-                Decode.succeed <| toString val
             )

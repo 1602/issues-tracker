@@ -1,4 +1,4 @@
-module Data.Column exposing (Column(..), decoder, encode)
+module Data.Column exposing (Column(Current, Backlog, Icebox, Done, Search), decoder, encode)
 
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)

@@ -1,4 +1,4 @@
-module Data.Issue exposing (Issue, IssueState(..), decoder)
+module Data.Issue exposing (Issue, IssueState(OpenIssue, ClosedIssue), decoder)
 
 import Decoders exposing (intToString, stringToDate)
 import Json.Decode as Decode exposing (Decoder, nullable)

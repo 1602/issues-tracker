@@ -1,6 +1,6 @@
 module Request.Milestone exposing (create, list)
 
-import Http exposing (Error, Response, Request)
+import Http exposing (Response, Request)
 import Data.Milestone as Milestone exposing (Milestone)
 import Json.Encode as Encode
 import Json.Decode as Decode
@@ -10,8 +10,8 @@ import HttpBuilder exposing (withExpect, withBody)
 import Util exposing ((=>))
 
 
-create : (String, String) -> String -> String -> Request Milestone
-create (user, repo) title accessToken =
+create : ( String, String ) -> String -> String -> Request Milestone
+create ( user, repo ) title accessToken =
     let
         body =
             [ "title" => Encode.string title
@@ -27,10 +27,10 @@ create (user, repo) title accessToken =
             |> HttpBuilder.toRequest
 
 
-list : (String, String) -> String -> Etags ->  CachedRequest (List Milestone)
+list : ( String, String ) -> String -> Etags -> CachedRequest (List Milestone)
 list repo accessToken etags =
     let
-        (u, r) =
+        ( u, r ) =
             repo
 
         decoder =
