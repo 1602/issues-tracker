@@ -3,14 +3,16 @@ module Pages.Repos exposing (Msg, Model, view, init, update)
 import Http exposing (Error)
 import Html exposing (div, text, ul, li, text)
 import Html.Attributes exposing (href)
-import Data.Repo as Repo exposing (Repo)
+import Data.Repo exposing (Repo)
 import Request.Repo
 import Data.PersistentData exposing (PersistentData)
 import Request.Cache exposing (Etags, RemoteData, retrieveError, retrieveData, updateCache)
 import Dict
 
+
 type Msg
     = LoadedReposList (Result Error (RemoteData (List Repo)))
+
 
 type alias Model =
     { list : List Repo
@@ -19,7 +21,8 @@ type alias Model =
     , cache : Etags
     }
 
-init : PersistentData -> (Model, Cmd Msg)
+
+init : PersistentData -> ( Model, Cmd Msg )
 init pd =
     let
         model =
@@ -29,20 +32,23 @@ init pd =
                 Nothing
                 Dict.empty
     in
-       model ! [ Request.Repo.list model.accessToken model.cache |> Http.send LoadedReposList ]
+        model ! [ Request.Repo.list model.accessToken model.cache |> Http.send LoadedReposList ]
 
 
 view : Model -> Html.Html Msg
 view model =
     model.list
-        |> List.map (\x -> li []
-            [ Html.a
-                [ href <| "#/" ++ x.fullName ++ "/stories" ]
-                [ Html.h4 [] [ text x.fullName ]
-                ]
-            , text <| " (" ++ (toString x.openIssuesCount) ++ " open issues)"
-            , div [] [ text (x.description |> Maybe.withDefault "") ]
-            ] )
+        |> List.map
+            (\x ->
+                li []
+                    [ Html.a
+                        [ href <| "#/" ++ x.fullName ++ "/stories" ]
+                        [ Html.h4 [] [ text x.fullName ]
+                        ]
+                    , text <| " (" ++ toString x.openIssuesCount ++ " open issues)"
+                    , div [] [ text (x.description |> Maybe.withDefault "") ]
+                    ]
+            )
         |> ul []
 
 
