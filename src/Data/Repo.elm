@@ -1,7 +1,8 @@
 module Data.Repo exposing (Repo, decoder)
 
-import Json.Decode as Decode exposing (Decoder, field, nullable, maybe, string, int, bool)
-import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional)
+import Json.Decode exposing (Decoder, nullable, string, int, bool)
+import Json.Decode.Pipeline exposing (decode, required)
+
 
 type alias Repo =
     { name : String

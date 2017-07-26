@@ -2,7 +2,7 @@ module GithubMarkdown exposing (ghMd)
 
 import Html
 import Markdown exposing (toHtml)
-import Regex exposing (regex, replace, HowMany(..))
+import Regex exposing (Regex, regex, replace, HowMany(All))
 
 
 ghMd : ( String, String ) -> String -> Html.Html msg

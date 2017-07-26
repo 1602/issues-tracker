@@ -1,7 +1,7 @@
 module Data.PersistentData exposing (PersistentData, decoder, encode, default)
 
 import Json.Decode exposing (Decoder, nullable, string, dict, list, bool)
-import Json.Decode.Pipeline as Pipeline exposing (decode, required, optional)
+import Json.Decode.Pipeline exposing (decode, optional)
 import Json.Encode as Encode exposing (Value)
 import Dict exposing (Dict)
 import Data.Column exposing (Column(..))

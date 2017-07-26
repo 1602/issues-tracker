@@ -1,6 +1,6 @@
 module Decoders exposing (..)
 
-import Json.Decode as Decode exposing (field, nullable, maybe)
+import Json.Decode as Decode
 import Date
 
 
